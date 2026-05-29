@@ -1736,3 +1736,133 @@ Sub DiagnosticoPesos()
     
     MsgBox msj, vbInformation, "Diagnóstico Pesos"
 End Sub
+
+
+Private Function LeerPesosDic25(ws As Worksheet, etiqueta As String) As Object
+    
+    Dim dic As Object
+    Set dic = CreateObject("Scripting.Dictionary")
+    
+    Dim ultCol As Long, ultFila As Long
+    ultCol = 50
+    ultFila = 300
+    
+    ' === PASO 1: Buscar "% de Cartera" para saber dónde empieza el bloque de PESOS ===
+    Dim filaInicioBusqueda As Long: filaInicioBusqueda = 1
+    
+    Dim r As Long, c As Long
+    For r = 1 To ultFila
+        For c = 1 To ultCol
+            On Error Resume Next
+            Dim valTxt As String
+            valTxt = LCase(Trim(CStr(ws.Cells(r, c).Value)))
+            On Error GoTo 0
+            If valTxt = "% de cartera" Or valTxt = "%decartera" Then
+                filaInicioBusqueda = r
+                Exit For
+            End If
+        Next c
+        If filaInicioBusqueda > 1 Then Exit For
+    Next r
+    
+    ' Si no encuentra "% de Cartera", asumimos que la sección de pesos empieza en fila 70
+    If filaInicioBusqueda = 1 Then filaInicioBusqueda = 70
+    
+    ' === PASO 2: Buscar "FONDO 2" o "FONDO 3" desde esa fila hacia abajo ===
+    Dim filaEtiqueta As Long: filaEtiqueta = 0
+    Dim colEtiqueta As Long: colEtiqueta = 0
+    
+    For r = filaInicioBusqueda To ultFila
+        For c = 1 To ultCol
+            On Error Resume Next
+            If UCase(Trim(CStr(ws.Cells(r, c).Value))) = UCase(etiqueta) Then
+                filaEtiqueta = r
+                colEtiqueta = c
+            End If
+            On Error GoTo 0
+            If filaEtiqueta > 0 Then Exit For
+        Next c
+        If filaEtiqueta > 0 Then Exit For
+    Next r
+    
+    If filaEtiqueta = 0 Then Set LeerPesosDic25 = dic: Exit Function
+    
+    ' === PASO 3: Detectar dónde empieza el siguiente FONDO X para limitar bloque ===
+    Dim colFinBloque As Long: colFinBloque = ultCol
+    Dim rEnc As Long
+    For rEnc = filaEtiqueta To filaEtiqueta + 3
+        For c = colEtiqueta + 1 To ultCol
+            On Error Resume Next
+            Dim val0 As String
+            val0 = UCase(Trim(CStr(ws.Cells(rEnc, c).Value)))
+            On Error GoTo 0
+            If Left(val0, 6) = "FONDO " And val0 <> UCase(etiqueta) Then
+                colFinBloque = c - 1
+                Exit For
+            End If
+        Next c
+        If colFinBloque < ultCol Then Exit For
+    Next rEnc
+    
+    ' === PASO 4: Buscar Código SBS y Dic-25 (texto o fecha) dentro del bloque ===
+    Dim filaEnc As Long: filaEnc = 0
+    Dim colCod As Long: colCod = 0
+    Dim colDic As Long: colDic = 0
+    
+    Dim rFin As Long
+    rFin = filaEtiqueta + 10
+    If rFin > ultFila Then rFin = ultFila
+    
+    For r = filaEtiqueta To rFin
+        Dim tmpCod As Long, tmpDic As Long
+        tmpCod = 0: tmpDic = 0
+        
+        For c = colEtiqueta To colFinBloque
+            On Error Resume Next
+            Dim valRaw As Variant
+            valRaw = ws.Cells(r, c).Value
+            
+            Dim valTxt2 As String
+            valTxt2 = LCase(Replace(Trim(CStr(valRaw)), " ", ""))
+            If valTxt2 = "códigosbs" Or valTxt2 = "codigosbs" Then tmpCod = c
+            
+            ' Detectar Dic-25: como texto o como fecha 01/12/2025
+            If valTxt2 = "dic-25" Or valTxt2 = "dic25" Then tmpDic = c
+            If IsDate(valRaw) Then
+                If Year(CDate(valRaw)) = 2025 And Month(CDate(valRaw)) = 12 Then tmpDic = c
+            End If
+            
+            On Error GoTo 0
+        Next c
+        
+        If tmpCod > 0 And tmpDic > 0 Then
+            colCod = tmpCod
+            colDic = tmpDic
+            filaEnc = r
+            Exit For
+        End If
+    Next r
+    
+    If colCod = 0 Or colDic = 0 Then Set LeerPesosDic25 = dic: Exit Function
+    
+    ' === PASO 5: Leer fondos desde filaEnc + 1 ===
+    Dim i As Long
+    For i = filaEnc + 1 To ultFila
+        On Error Resume Next
+        Dim cod As String, pesoVal As Variant
+        cod = Trim(CStr(ws.Cells(i, colCod).Value))
+        
+        If UCase(Left(cod, 6)) = "FONDO " Then Exit For
+        If cod = "" Then Exit For
+        
+        pesoVal = ws.Cells(i, colDic).Value
+        If IsNumeric(pesoVal) Then
+            dic(cod) = CDbl(pesoVal)
+        Else
+            dic(cod) = 0
+        End If
+        On Error GoTo 0
+    Next i
+    
+    Set LeerPesosDic25 = dic
+End Function
