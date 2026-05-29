@@ -1866,3 +1866,104 @@ Private Function LeerPesosDic25(ws As Worksheet, etiqueta As String) As Object
     
     Set LeerPesosDic25 = dic
 End Function
+
+Sub GenerarResumenTotal()
+    
+    Dim wb As Workbook
+    Set wb = ThisWorkbook
+    
+    Dim wsPesos As Worksheet, wsFondos As Worksheet
+    Dim wsCuadroLoc As Worksheet, wsCuadroExt As Worksheet
+    
+    On Error Resume Next
+    Set wsPesos = wb.Sheets("Pesos")
+    Set wsFondos = wb.Sheets("Fondos")
+    Set wsCuadroLoc = wb.Sheets("Cuadro Locales")
+    Set wsCuadroExt = wb.Sheets("Cuadro Extranjeros")
+    On Error GoTo 0
+    
+    If wsPesos Is Nothing Or wsFondos Is Nothing _
+       Or wsCuadroLoc Is Nothing Or wsCuadroExt Is Nothing Then
+        MsgBox "Faltan hojas necesarias.", vbCritical
+        Exit Sub
+    End If
+    
+    Application.ScreenUpdating = False
+    
+    Dim wsDest As Worksheet
+    Set wsDest = ObtenerHoja(wb, "Resumen Total")
+    wsDest.Cells.Clear
+    
+    Dim wsAux As Worksheet
+    Set wsAux = ObtenerHoja(wb, "_Aux")
+    wsAux.Visible = xlSheetVisible
+    wsAux.Cells.Clear
+    
+    ConstruirHojaAuxiliar wsAux, wsPesos, wsFondos
+    
+    wsAux.Visible = xlSheetVeryHidden
+    
+    ' Celda B1: forzar texto y poner valor por defecto
+    wsDest.Range("A1").Value = "Mes seleccionado:"
+    wsDest.Range("A1").Font.Bold = True
+    
+    ' IMPORTANTE: formato texto ANTES de escribir
+    wsDest.Range("B1").NumberFormat = "@"
+    
+    ' Buscar el último mes con datos en Cuadro Locales para usarlo como default
+    Dim mesDefault As String: mesDefault = "mar-26"
+    Dim ultColLoc As Long
+    ultColLoc = wsCuadroLoc.Cells(1, wsCuadroLoc.Columns.Count).End(xlToLeft).Column
+    If ultColLoc >= 3 Then
+        Dim ultEncab As String
+        ultEncab = Trim(CStr(wsCuadroLoc.Cells(1, ultColLoc).Value))
+        If ultEncab <> "" Then mesDefault = ultEncab
+    End If
+    
+    wsDest.Range("B1").Value = mesDefault
+    wsDest.Range("B1").Font.Bold = True
+    wsDest.Range("B1").Font.Size = 12
+    wsDest.Range("B1").Interior.Color = RGB(255, 240, 180)
+    wsDest.Range("B1").Borders.LineStyle = xlContinuous
+    wsDest.Range("B1").HorizontalAlignment = xlCenter
+    
+    ' Agregar lista desplegable con todos los meses disponibles del Cuadro Locales
+    Dim listaMeses As String: listaMeses = ""
+    Dim c As Long
+    For c = 3 To ultColLoc
+        Dim enc As String
+        enc = Trim(CStr(wsCuadroLoc.Cells(1, c).Value))
+        If enc <> "" Then
+            If listaMeses = "" Then
+                listaMeses = enc
+            Else
+                listaMeses = listaMeses & "," & enc
+            End If
+        End If
+    Next c
+    
+    If listaMeses <> "" Then
+        With wsDest.Range("B1").Validation
+            .Delete
+            On Error Resume Next
+            .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Formula1:=listaMeses
+            On Error GoTo 0
+            .IgnoreBlank = True
+            .InCellDropdown = True
+            .ShowError = False
+        End With
+    End If
+    
+    Dim filaActual As Long: filaActual = 3
+    filaActual = ArmarBloqueFondo(wsDest, filaActual, "FONDO 2", "F2", wsCuadroLoc, wsCuadroExt, wsAux)
+    filaActual = filaActual + 2
+    filaActual = ArmarBloqueFondo(wsDest, filaActual, "FONDO 3", "F3", wsCuadroLoc, wsCuadroExt, wsAux)
+    
+    wsDest.Columns("A:D").AutoFit
+    wsDest.Activate
+    wsDest.Range("B1").Select
+    
+    Application.ScreenUpdating = True
+
+End Sub
+
