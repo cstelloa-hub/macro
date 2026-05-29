@@ -1814,3 +1814,56 @@ Sub DiagnosticoPesos()
     
     MsgBox msj, vbInformation, "Diagnóstico Pesos"
 End Sub
+
+Sub VerFormulaYTD()
+    Dim wsPxR As Worksheet
+    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
+    
+    Dim info As String
+    info = LocalizarSeccionPxR(wsPxR, "LOCAL", "Fondo 2")
+    
+    If info = "" Then
+        MsgBox "No se encontró sección LOCAL / Fondo 2"
+        Exit Sub
+    End If
+    
+    Dim partes() As String
+    partes = Split(info, "|")
+    Dim filaEnc As Long: filaEnc = CLng(partes(0))
+    Dim colDic25 As Long: colDic25 = CLng(partes(1))
+    Dim colUltMes As Long: colUltMes = CLng(partes(2))
+    
+    Dim subpartes() As String
+    subpartes = Split(partes(3), ";")
+    
+    Dim primerMesCol As Long: primerMesCol = colDic25 + 1
+    Dim nombreHojaPxR As String
+    nombreHojaPxR = "'" & wsPxR.Name & "'"
+    
+    ' Tomar el primer tipo para mostrar la fórmula
+    If UBound(subpartes) >= 1 Then
+        Dim sp() As String
+        sp = Split(subpartes(1), ":")
+        Dim filaTipoPxR As Long: filaTipoPxR = CLng(sp(1))
+        
+        Dim rangoEncab As String
+        rangoEncab = nombreHojaPxR & "!" & Columna(colDic25) & filaEnc & ":" & _
+                     Columna(colUltMes) & filaEnc
+        
+        Dim formYtd As String
+        formYtd = "=IFERROR(IF(MATCH($B$1," & rangoEncab & ",0)<=1,0," & _
+                  "PRODUCT(1+OFFSET(" & nombreHojaPxR & "!" & _
+                  Columna(primerMesCol) & filaTipoPxR & ",0,0,1," & _
+                  "MATCH($B$1," & rangoEncab & ",0)-1))-1),0)"
+        
+        Dim msj As String
+        msj = "Fila encabezados PxR: " & filaEnc & vbCrLf
+        msj = msj & "Col Dic-25: " & Columna(colDic25) & vbCrLf
+        msj = msj & "Col Ult Mes: " & Columna(colUltMes) & vbCrLf
+        msj = msj & "Fila Tipo (primer subtotal): " & filaTipoPxR & vbCrLf & vbCrLf
+        msj = msj & "FÓRMULA YTD:" & vbCrLf & vbCrLf
+        msj = msj & formYtd
+        
+        MsgBox msj, vbInformation, "Diagnóstico YTD"
+    End If
+End Sub
