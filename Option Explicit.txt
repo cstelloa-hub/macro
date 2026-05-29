@@ -1879,3 +1879,62 @@ Sub VerFormulaYTD()
         MsgBox msj, vbInformation, "Diagnóstico YTD"
     End If
 End Sub
+
+Sub VerFormulasFalladas()
+    Dim wsResumen As Worksheet
+    Set wsResumen = ThisWorkbook.Sheets("Resumen Total")
+    
+    Dim wsPxR As Worksheet
+    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
+    
+    ' Reconstruir info LOCAL Fondo 2
+    Dim info As String
+    info = LocalizarSeccionPxR(wsPxR, "LOCAL", "Fondo 2")
+    
+    If info = "" Then
+        MsgBox "No se encontró sección"
+        Exit Sub
+    End If
+    
+    Dim partes() As String
+    partes = Split(info, "|")
+    Dim filaEnc As Long: filaEnc = CLng(partes(0))
+    Dim colDic25 As Long: colDic25 = CLng(partes(1))
+    Dim colUltMes As Long: colUltMes = CLng(partes(2))
+    
+    Dim subpartes() As String
+    subpartes = Split(partes(3), ";")
+    
+    Dim msj As String
+    msj = "Encabezados PxR fila: " & filaEnc & vbCrLf
+    msj = msj & "Col Dic-25: " & Columna(colDic25) & " (num " & colDic25 & ")" & vbCrLf
+    msj = msj & "Col Ult Mes: " & Columna(colUltMes) & " (num " & colUltMes & ")" & vbCrLf & vbCrLf
+    
+    Dim primerMesCol As Long: primerMesCol = colDic25 + 1
+    msj = msj & "Primer mes col: " & Columna(primerMesCol) & " (num " & primerMesCol & ")" & vbCrLf & vbCrLf
+    
+    msj = msj & "TIPOS DETECTADOS:" & vbCrLf
+    
+    Dim nombreHojaPxR As String
+    nombreHojaPxR = "'" & wsPxR.Name & "'"
+    
+    Dim i As Long
+    For i = 1 To UBound(subpartes)
+        If subpartes(i) <> "" Then
+            Dim sp() As String
+            sp = Split(subpartes(i), ":")
+            If UBound(sp) >= 1 Then
+                Dim tipo As String: tipo = sp(0)
+                Dim filaTipoPxR As Long: filaTipoPxR = CLng(sp(1))
+                msj = msj & "  '" & tipo & "' -> fila " & filaTipoPxR & vbCrLf
+                
+                ' Probar leer un valor de esa fila para confirmar
+                Dim valPrueba As Variant
+                valPrueba = wsPxR.Cells(filaTipoPxR, primerMesCol).Value
+                msj = msj & "    Valor en " & Columna(primerMesCol) & filaTipoPxR & ": " & valPrueba & vbCrLf
+            End If
+        End If
+    Next i
+    
+    MsgBox msj, vbInformation, "Debug YTD"
+End Sub
