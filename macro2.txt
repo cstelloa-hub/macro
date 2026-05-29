@@ -7,11 +7,11 @@ Sub ActualizarTodo()
     
     Dim respuesta As VbMsgBoxResult
     respuesta = MsgBox("Esto va a:" & vbCrLf & vbCrLf & _
-                       "1. Extraer la data cruda del nuevo Marcas.xlsx" & vbCrLf & _
+                       "1. Extraer data cruda de Marcas.xlsx" & vbCrLf & _
                        "2. Regenerar Cuadro Locales y Cuadro Extranjeros" & vbCrLf & _
-                       "3. Regenerar el cuadro MTD-YTD" & vbCrLf & _
-                       "4. Regenerar la hoja Base 100 y los Gráficos" & vbCrLf & _
-                       "5. Regenerar el Resumen Total" & vbCrLf & vbCrLf & _
+                       "3. Regenerar Base 100 y Gráficos" & vbCrLf & _
+                       "4. Regenerar Resumen Total" & vbCrLf & _
+                       "5. Regenerar Pesos x Retornos" & vbCrLf & vbCrLf & _
                        "¿Continuar?", vbYesNo + vbQuestion, "Actualizar Todo")
     
     If respuesta = vbNo Then Exit Sub
@@ -25,27 +25,21 @@ Sub ActualizarTodo()
     Application.StatusBar = "Paso 2 de 5: Generando cuadros mensual y trimestral..."
     GenerarCuadros
     
-    Application.StatusBar = "Paso 3 de 5: Generando cuadros MTD-YTD..."
-    GenerarMTDYTD
-    
-    Application.StatusBar = "Paso 4 de 5: Generando Base 100 y Gráficos..."
+    Application.StatusBar = "Paso 3 de 5: Generando Base 100 y Gráficos..."
     GenerarBase100YGraficos
     
-    Application.StatusBar = "Paso 5 de 5: Generando Resumen Total..."
+    Application.StatusBar = "Paso 4 de 5: Generando Resumen Total..."
     GenerarResumenTotal
+    
+    Application.StatusBar = "Paso 5 de 5: Generando Pesos x Retornos..."
+    GenerarPesosXRetornos
     
     Application.StatusBar = False
     
     Dim duracion As Double
     duracion = Timer - tInicio
     
-    MsgBox "Actualización completa en " & Format(duracion, "0.0") & " segundos." & vbCrLf & vbCrLf & _
-           "Hojas generadas:" & vbCrLf & _
-           "  • Data Locales / Data Extranjeros" & vbCrLf & _
-           "  • Cuadro Locales / Cuadro Extranjeros" & vbCrLf & _
-           "  • MTD-YTD" & vbCrLf & _
-           "  • Base 100 / Gráficos" & vbCrLf & _
-           "  • Resumen Total (cambia mes en B1)", vbInformation, "Listo"
+    MsgBox "Actualización completa en " & Format(duracion, "0.0") & " segundos.", vbInformation, "Listo"
 
 End Sub
 
@@ -63,7 +57,7 @@ Sub ExtraerData()
     
     rutaMarcas = Application.GetOpenFilename( _
         FileFilter:="Archivos Excel (*.xlsx;*.xlsm), *.xlsx;*.xlsm", _
-        Title:="Selecciona el archivo Marcas.xlsx")
+        Title:="Selecciona Marcas.xlsx")
     
     If rutaMarcas = False Then
         MsgBox "No seleccionaste ningún archivo.", vbExclamation
@@ -403,65 +397,69 @@ Private Sub ArmarCuadro(wsResumen As Worksheet, wsData As Worksheet, _
 End Sub
 
 '==================================================================
-' MACRO 3: Generar cuadros MTD y YTD ponderados
+' MACRO 3: Base 100 - 4 cuadros separados (F2 Loc, F2 Ext, F3 Loc, F3 Ext)
 '==================================================================
-Sub GenerarMTDYTD()
-
+Sub GenerarBase100YGraficos()
+    
     Dim wb As Workbook
     Set wb = ThisWorkbook
     
-    Dim wsResumen As Worksheet, wsPesos As Worksheet, wsFondos As Worksheet
-    Dim wsCuadroLoc As Worksheet, wsCuadroExt As Worksheet, wsDest As Worksheet
+    Dim wsCuadroLoc As Worksheet, wsCuadroExt As Worksheet, wsFondos As Worksheet, wsPesos As Worksheet
     
     On Error Resume Next
-    Set wsResumen = wb.Sheets("Resumen")
-    Set wsPesos = wb.Sheets("Pesos")
-    Set wsFondos = wb.Sheets("Fondos")
     Set wsCuadroLoc = wb.Sheets("Cuadro Locales")
     Set wsCuadroExt = wb.Sheets("Cuadro Extranjeros")
+    Set wsFondos = wb.Sheets("Fondos")
+    Set wsPesos = wb.Sheets("Pesos")
     On Error GoTo 0
     
-    If wsResumen Is Nothing Or wsPesos Is Nothing Or wsFondos Is Nothing _
-       Or wsCuadroLoc Is Nothing Or wsCuadroExt Is Nothing Then
-        MsgBox "Necesito las hojas: Resumen, Pesos, Fondos, Cuadro Locales, Cuadro Extranjeros.", vbCritical
+    If wsCuadroLoc Is Nothing Or wsCuadroExt Is Nothing _
+       Or wsFondos Is Nothing Or wsPesos Is Nothing Then
+        MsgBox "Faltan hojas necesarias.", vbCritical
         Exit Sub
     End If
     
     Application.ScreenUpdating = False
     
-    Set wsDest = ObtenerHoja(wb, "MTD-YTD")
-    wsDest.Cells.Clear
-    
-    Dim tiposFondo As Object
-    Set tiposFondo = LeerTiposFondos(wsFondos)
-    
+    Dim tipos As Object
+    Set tipos = LeerTiposFondos(wsFondos)
     Dim pesosF2 As Object, pesosF3 As Object
     Set pesosF2 = LeerPesosDic25(wsPesos, "FONDO 2")
     Set pesosF3 = LeerPesosDic25(wsPesos, "FONDO 3")
     
-    Dim filaActual As Long: filaActual = 1
+    Dim wsBase As Worksheet
+    Set wsBase = ObtenerHoja(wb, "Base 100")
+    wsBase.Cells.Clear
     
-    filaActual = ArmarCuadroMTDYTD(wsDest, filaActual, wsCuadroLoc, _
-        pesosF2, tiposFondo, "LOCALES - FONDO 2", "LOCAL")
-    filaActual = ArmarCuadroMTDYTD(wsDest, filaActual, wsCuadroLoc, _
-        pesosF3, tiposFondo, "LOCALES - FONDO 3", "LOCAL")
-    filaActual = ArmarCuadroMTDYTD(wsDest, filaActual, wsCuadroExt, _
-        pesosF2, tiposFondo, "EXTRANJEROS - FONDO 2", "EXTRANJERO")
-    filaActual = ArmarCuadroMTDYTD(wsDest, filaActual, wsCuadroExt, _
-        pesosF3, tiposFondo, "EXTRANJEROS - FONDO 3", "EXTRANJERO")
+    Dim fila As Long: fila = 1
+    fila = ArmarTablaBase100(wsBase, fila, wsCuadroLoc, tipos, pesosF2, "F2 - LOCALES")
+    fila = fila + 2
+    fila = ArmarTablaBase100(wsBase, fila, wsCuadroExt, tipos, pesosF2, "F2 - EXTRANJEROS")
+    fila = fila + 2
+    fila = ArmarTablaBase100(wsBase, fila, wsCuadroLoc, tipos, pesosF3, "F3 - LOCALES")
+    fila = fila + 2
+    fila = ArmarTablaBase100(wsBase, fila, wsCuadroExt, tipos, pesosF3, "F3 - EXTRANJEROS")
     
-    wsDest.Columns.AutoFit
-    wsDest.Activate
-    wsDest.Range("A1").Select
+    wsBase.Columns.AutoFit
+    
+    Dim wsGraf As Worksheet
+    Set wsGraf = ObtenerHoja(wb, "Gráficos")
+    
+    Dim ch As ChartObject
+    For Each ch In wsGraf.ChartObjects
+        ch.Delete
+    Next ch
+    wsGraf.Cells.Clear
+    
+    GenerarGraficosPorTipo wsBase, wsGraf, tipos
     
     Application.ScreenUpdating = True
 
 End Sub
 
-Private Function ArmarCuadroMTDYTD(wsDest As Worksheet, filaInicio As Long, _
-                                    wsCuadro As Worksheet, pesos As Object, _
-                                    tipos As Object, titulo As String, _
-                                    tipoCuadro As String) As Long
+Private Function ArmarTablaBase100(wsDest As Worksheet, filaInicio As Long, _
+                                    wsCuadro As Worksheet, tipos As Object, _
+                                    pesos As Object, titulo As String) As Long
     
     Dim fila As Long: fila = filaInicio
     
@@ -471,13 +469,13 @@ Private Function ArmarCuadroMTDYTD(wsDest As Worksheet, filaInicio As Long, _
     
     If ultColC < 3 Or ultFilaC < 2 Then
         wsDest.Cells(fila, 1).Value = titulo & " (sin datos)"
-        ArmarCuadroMTDYTD = fila + 2
+        ArmarTablaBase100 = fila + 2
         Exit Function
     End If
     
-    Dim colsPeriodo As Collection, encabezadosPeriodo As Collection
-    Set colsPeriodo = New Collection
-    Set encabezadosPeriodo = New Collection
+    Dim cols2026 As Collection, encabs2026 As Collection
+    Set cols2026 = New Collection
+    Set encabs2026 = New Collection
     
     Dim c As Long
     For c = 3 To ultColC
@@ -497,340 +495,38 @@ Private Function ArmarCuadroMTDYTD(wsDest As Worksheet, filaInicio As Long, _
             Err.Clear
             On Error GoTo 0
             If anio = 2026 Then
-                colsPeriodo.Add c
-                encabezadosPeriodo.Add h
+                cols2026.Add c
+                encabs2026.Add h
             End If
         End If
     Next c
     
-    If colsPeriodo.Count = 0 Then
+    If cols2026.Count = 0 Then
         wsDest.Cells(fila, 1).Value = titulo & " (no hay datos de 2026)"
-        ArmarCuadroMTDYTD = fila + 2
-        Exit Function
-    End If
-    
-    Dim porTipo As Object
-    Set porTipo = CreateObject("Scripting.Dictionary")
-    Dim ordenTipos As Collection
-    Set ordenTipos = New Collection
-    
-    Dim r As Long
-    For r = 2 To ultFilaC
-        Dim cod As String, nom As String
-        nom = Trim(CStr(wsCuadro.Cells(r, 1).Value))
-        cod = Trim(CStr(wsCuadro.Cells(r, 2).Value))
-        If cod <> "" And pesos.exists(cod) Then
-            Dim tipoF As String
-            tipoF = "Sin clasificar"
-            If tipos.exists(cod) Then tipoF = tipos(cod)
-            If Not porTipo.exists(tipoF) Then
-                Set porTipo(tipoF) = New Collection
-                ordenTipos.Add tipoF
-            End If
-            porTipo(tipoF).Add CStr(r) & "|" & cod & "|" & nom
-        End If
-    Next r
-    
-    ' CUADRO MTD
-    wsDest.Cells(fila, 1).Value = titulo & " - MTD (Contribución ponderada)"
-    wsDest.Cells(fila, 1).Font.Bold = True
-    wsDest.Cells(fila, 1).Font.Size = 12
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 4 + colsPeriodo.Count)).Interior.Color = RGB(180, 200, 230)
-    fila = fila + 1
-    
-    wsDest.Cells(fila, 1).Value = "Fondo"
-    wsDest.Cells(fila, 2).Value = "Código SBS"
-    wsDest.Cells(fila, 3).Value = "Tipo"
-    wsDest.Cells(fila, 4).Value = "Peso Dic-25"
-    Dim k As Long
-    For k = 1 To encabezadosPeriodo.Count
-        wsDest.Cells(fila, 4 + k).Value = encabezadosPeriodo(k)
-    Next k
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 4 + encabezadosPeriodo.Count)).Font.Bold = True
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 4 + encabezadosPeriodo.Count)).Interior.Color = RGB(220, 230, 200)
-    fila = fila + 1
-    
-    Dim subtotalesMTD As Object
-    Set subtotalesMTD = CreateObject("Scripting.Dictionary")
-    Dim subtotalesPeso As Object
-    Set subtotalesPeso = CreateObject("Scripting.Dictionary")
-    
-    Dim totalMTD() As Double, totalPesoTotal As Double
-    ReDim totalMTD(1 To colsPeriodo.Count)
-    totalPesoTotal = 0
-    
-    Dim tipoIter As Variant
-    For Each tipoIter In ordenTipos
-        Dim listaFondos As Collection
-        Set listaFondos = porTipo(CStr(tipoIter))
-        
-        Dim subArr() As Double
-        ReDim subArr(1 To colsPeriodo.Count)
-        Dim subPeso As Double: subPeso = 0
-        
-        Dim item As Variant
-        For Each item In listaFondos
-            Dim partes() As String
-            partes = Split(CStr(item), "|")
-            Dim filaCuadro As Long: filaCuadro = CLng(partes(0))
-            Dim codigo As String: codigo = partes(1)
-            Dim nombre As String: nombre = partes(2)
-            Dim peso As Double: peso = CDbl(pesos(codigo))
-            
-            wsDest.Cells(fila, 1).Value = nombre
-            wsDest.Cells(fila, 2).Value = codigo
-            wsDest.Cells(fila, 3).Value = CStr(tipoIter)
-            wsDest.Cells(fila, 4).Value = peso
-            wsDest.Cells(fila, 4).NumberFormat = "0.00%"
-            
-            Dim col As Long
-            For col = 1 To colsPeriodo.Count
-                Dim colOrig As Long: colOrig = colsPeriodo(col)
-                Dim vRet As Variant
-                vRet = wsCuadro.Cells(filaCuadro, colOrig).Value
-                If IsNumeric(vRet) And vRet <> "" Then
-                    Dim contrib As Double
-                    contrib = CDbl(vRet) * peso
-                    wsDest.Cells(fila, 4 + col).Value = contrib
-                    wsDest.Cells(fila, 4 + col).NumberFormat = "0.00%"
-                    subArr(col) = subArr(col) + contrib
-                    totalMTD(col) = totalMTD(col) + contrib
-                End If
-            Next col
-            
-            subPeso = subPeso + peso
-            totalPesoTotal = totalPesoTotal + peso
-            fila = fila + 1
-        Next item
-        
-        Dim arrComoString As String: arrComoString = ""
-        For col = 1 To colsPeriodo.Count
-            arrComoString = arrComoString & CStr(subArr(col))
-            If col < colsPeriodo.Count Then arrComoString = arrComoString & "|"
-        Next col
-        subtotalesMTD(CStr(tipoIter)) = arrComoString
-        subtotalesPeso(CStr(tipoIter)) = subPeso
-    Next tipoIter
-    
-    fila = fila + 1
-    
-    wsDest.Cells(fila, 1).Value = "TOTAL GENERAL"
-    wsDest.Cells(fila, 4).Value = totalPesoTotal
-    wsDest.Cells(fila, 4).NumberFormat = "0.00%"
-    For c = 1 To colsPeriodo.Count
-        wsDest.Cells(fila, 4 + c).Value = totalMTD(c)
-        wsDest.Cells(fila, 4 + c).NumberFormat = "0.00%"
-    Next c
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 4 + colsPeriodo.Count)).Font.Bold = True
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 4 + colsPeriodo.Count)).Interior.Color = RGB(200, 220, 240)
-    fila = fila + 1
-    
-    For Each tipoIter In ordenTipos
-        wsDest.Cells(fila, 1).Value = UCase(CStr(tipoIter)) & " TOTAL"
-        wsDest.Cells(fila, 4).Value = subtotalesPeso(CStr(tipoIter))
-        wsDest.Cells(fila, 4).NumberFormat = "0.00%"
-        Dim valsSub() As String
-        valsSub = Split(subtotalesMTD(CStr(tipoIter)), "|")
-        For col = 1 To colsPeriodo.Count
-            wsDest.Cells(fila, 4 + col).Value = CDbl(valsSub(col - 1))
-            wsDest.Cells(fila, 4 + col).NumberFormat = "0.00%"
-        Next col
-        wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 4 + colsPeriodo.Count)).Font.Bold = True
-        wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 4 + colsPeriodo.Count)).Interior.Color = RGB(240, 240, 200)
-        fila = fila + 1
-    Next tipoIter
-    
-    fila = fila + 2
-    
-    ' CUADRO YTD
-    wsDest.Cells(fila, 1).Value = titulo & " - YTD (Contribución acumulada)"
-    wsDest.Cells(fila, 1).Font.Bold = True
-    wsDest.Cells(fila, 1).Font.Size = 12
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 6)).Interior.Color = RGB(180, 200, 230)
-    fila = fila + 1
-    
-    wsDest.Cells(fila, 1).Value = "Fondo"
-    wsDest.Cells(fila, 2).Value = "Código SBS"
-    wsDest.Cells(fila, 3).Value = "Tipo"
-    wsDest.Cells(fila, 4).Value = "Peso Dic-25"
-    wsDest.Cells(fila, 5).Value = "Ret YTD fondo"
-    wsDest.Cells(fila, 6).Value = "Contribución YTD"
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 6)).Font.Bold = True
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 6)).Interior.Color = RGB(220, 230, 200)
-    fila = fila + 1
-    
-    Dim totalContribYTD As Double: totalContribYTD = 0
-    Dim subContribYTD As Object, subPesoYTD As Object
-    Set subContribYTD = CreateObject("Scripting.Dictionary")
-    Set subPesoYTD = CreateObject("Scripting.Dictionary")
-    
-    For Each tipoIter In ordenTipos
-        Set listaFondos = porTipo(CStr(tipoIter))
-        Dim sumContrib As Double: sumContrib = 0
-        Dim sumPeso As Double: sumPeso = 0
-        
-        For Each item In listaFondos
-            partes = Split(CStr(item), "|")
-            filaCuadro = CLng(partes(0))
-            codigo = partes(1)
-            nombre = partes(2)
-            peso = CDbl(pesos(codigo))
-            
-            Dim acumulado As Double: acumulado = 1
-            Dim tieneAlgo As Boolean: tieneAlgo = False
-            For col = 1 To colsPeriodo.Count
-                colOrig = colsPeriodo(col)
-                vRet = wsCuadro.Cells(filaCuadro, colOrig).Value
-                If IsNumeric(vRet) And vRet <> "" Then
-                    acumulado = acumulado * (1 + CDbl(vRet))
-                    tieneAlgo = True
-                End If
-            Next col
-            
-            Dim retYTD As Double, contribYTD As Double
-            If tieneAlgo Then
-                retYTD = acumulado - 1
-                contribYTD = peso * retYTD
-            End If
-            
-            wsDest.Cells(fila, 1).Value = nombre
-            wsDest.Cells(fila, 2).Value = codigo
-            wsDest.Cells(fila, 3).Value = CStr(tipoIter)
-            wsDest.Cells(fila, 4).Value = peso
-            wsDest.Cells(fila, 4).NumberFormat = "0.00%"
-            If tieneAlgo Then
-                wsDest.Cells(fila, 5).Value = retYTD
-                wsDest.Cells(fila, 5).NumberFormat = "0.00%"
-                wsDest.Cells(fila, 6).Value = contribYTD
-                wsDest.Cells(fila, 6).NumberFormat = "0.00%"
-                sumContrib = sumContrib + contribYTD
-                totalContribYTD = totalContribYTD + contribYTD
-            End If
-            sumPeso = sumPeso + peso
-            fila = fila + 1
-        Next item
-        
-        subContribYTD(CStr(tipoIter)) = sumContrib
-        subPesoYTD(CStr(tipoIter)) = sumPeso
-    Next tipoIter
-    
-    fila = fila + 1
-    
-    wsDest.Cells(fila, 1).Value = "TOTAL GENERAL"
-    wsDest.Cells(fila, 4).Value = totalPesoTotal
-    wsDest.Cells(fila, 4).NumberFormat = "0.00%"
-    wsDest.Cells(fila, 6).Value = totalContribYTD
-    wsDest.Cells(fila, 6).NumberFormat = "0.00%"
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 6)).Font.Bold = True
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 6)).Interior.Color = RGB(200, 220, 240)
-    fila = fila + 1
-    
-    For Each tipoIter In ordenTipos
-        wsDest.Cells(fila, 1).Value = UCase(CStr(tipoIter)) & " TOTAL"
-        wsDest.Cells(fila, 4).Value = subPesoYTD(CStr(tipoIter))
-        wsDest.Cells(fila, 4).NumberFormat = "0.00%"
-        wsDest.Cells(fila, 6).Value = subContribYTD(CStr(tipoIter))
-        wsDest.Cells(fila, 6).NumberFormat = "0.00%"
-        wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 6)).Font.Bold = True
-        wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 6)).Interior.Color = RGB(240, 240, 200)
-        fila = fila + 1
-    Next tipoIter
-    
-    fila = fila + 3
-    
-    ArmarCuadroMTDYTD = fila
-End Function
-
-'==================================================================
-' MACRO 4: Generar tablas Base 100 y gráficos
-'==================================================================
-Sub GenerarBase100YGraficos()
-    
-    Dim wb As Workbook
-    Set wb = ThisWorkbook
-    
-    Dim wsCuadroLoc As Worksheet, wsCuadroExt As Worksheet, wsFondos As Worksheet
-    
-    On Error Resume Next
-    Set wsCuadroLoc = wb.Sheets("Cuadro Locales")
-    Set wsCuadroExt = wb.Sheets("Cuadro Extranjeros")
-    Set wsFondos = wb.Sheets("Fondos")
-    On Error GoTo 0
-    
-    If wsCuadroLoc Is Nothing Or wsCuadroExt Is Nothing Or wsFondos Is Nothing Then
-        MsgBox "Faltan hojas: 'Cuadro Locales', 'Cuadro Extranjeros' o 'Fondos'.", vbCritical
-        Exit Sub
-    End If
-    
-    Application.ScreenUpdating = False
-    
-    Dim tiposFondo As Object
-    Set tiposFondo = LeerTiposFondos(wsFondos)
-    
-    Dim wsBase As Worksheet
-    Set wsBase = ObtenerHoja(wb, "Base 100")
-    wsBase.Cells.Clear
-    
-    Dim filaSiguiente As Long
-    filaSiguiente = 1
-    filaSiguiente = ArmarTablaBase100(wsBase, filaSiguiente, wsCuadroLoc, tiposFondo, "LOCALES", "LOCAL")
-    filaSiguiente = filaSiguiente + 2
-    filaSiguiente = ArmarTablaBase100(wsBase, filaSiguiente, wsCuadroExt, tiposFondo, "EXTRANJEROS", "EXTRANJERO")
-    
-    wsBase.Columns.AutoFit
-    
-    Dim wsGraf As Worksheet
-    Set wsGraf = ObtenerHoja(wb, "Gráficos")
-    
-    Dim ch As ChartObject
-    For Each ch In wsGraf.ChartObjects
-        ch.Delete
-    Next ch
-    wsGraf.Cells.Clear
-    
-    GenerarGraficosPorTipo wsBase, wsGraf, tiposFondo
-    
-    Application.ScreenUpdating = True
-
-End Sub
-
-Private Function ArmarTablaBase100(wsDest As Worksheet, filaInicio As Long, _
-                                    wsCuadro As Worksheet, tipos As Object, _
-                                    titulo As String, tipoCuadro As String) As Long
-    
-    Dim fila As Long: fila = filaInicio
-    
-    Dim ultColC As Long, ultFilaC As Long
-    ultColC = wsCuadro.Cells(1, wsCuadro.Columns.Count).End(xlToLeft).Column
-    ultFilaC = wsCuadro.Cells(wsCuadro.Rows.Count, 1).End(xlUp).Row
-    
-    If ultColC < 3 Or ultFilaC < 2 Then
-        wsDest.Cells(fila, 1).Value = titulo & " (sin datos)"
         ArmarTablaBase100 = fila + 2
         Exit Function
     End If
     
+    Dim ultColTot As Long: ultColTot = 5 + cols2026.Count
+    
     wsDest.Cells(fila, 1).Value = titulo & " - Retorno Acumulado (Dic-25 = 0%)"
     wsDest.Cells(fila, 1).Font.Bold = True
     wsDest.Cells(fila, 1).Font.Size = 12
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 4 + (ultColC - 2))).Interior.Color = RGB(180, 200, 230)
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColTot)).Interior.Color = RGB(180, 30, 30)
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColTot)).Font.Color = RGB(255, 255, 255)
     fila = fila + 1
     
-    wsDest.Cells(fila, 1).Value = "Fondo"
+    wsDest.Cells(fila, 1).Value = "Retornos 2026"
     wsDest.Cells(fila, 2).Value = "Código SBS"
     wsDest.Cells(fila, 3).Value = "Tipo"
-    wsDest.Cells(fila, 4).Value = "Dic-25"
-    
-    Dim c As Long
-    For c = 3 To ultColC
-        wsDest.Cells(fila, 4 + (c - 2)).Value = wsCuadro.Cells(1, c).Value
-    Next c
-    
-    Dim ultColDest As Long
-    ultColDest = 4 + (ultColC - 2)
-    
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColDest)).Font.Bold = True
-    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColDest)).Interior.Color = RGB(220, 230, 200)
+    wsDest.Cells(fila, 4).Value = "Peso Dic-25"
+    wsDest.Cells(fila, 5).Value = "Dic-25"
+    Dim k As Long
+    For k = 1 To encabs2026.Count
+        wsDest.Cells(fila, 5 + k).Value = encabs2026(k)
+    Next k
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColTot)).Font.Bold = True
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColTot)).Interior.Color = RGB(220, 230, 200)
     fila = fila + 1
     
     Dim r As Long
@@ -840,6 +536,10 @@ Private Function ArmarTablaBase100(wsDest As Worksheet, filaInicio As Long, _
         codigo = Trim(CStr(wsCuadro.Cells(r, 2).Value))
         
         If codigo = "" Then GoTo SiguienteFondo
+        If Not pesos.exists(codigo) Then GoTo SiguienteFondo
+        
+        Dim peso As Double: peso = CDbl(pesos(codigo))
+        If peso = 0 Then GoTo SiguienteFondo
         
         tipoF = "Sin clasificar"
         If tipos.exists(codigo) Then tipoF = tipos(codigo)
@@ -847,19 +547,23 @@ Private Function ArmarTablaBase100(wsDest As Worksheet, filaInicio As Long, _
         wsDest.Cells(fila, 1).Value = nombre
         wsDest.Cells(fila, 2).Value = codigo
         wsDest.Cells(fila, 3).Value = tipoF
-        wsDest.Cells(fila, 4).Value = 0
+        wsDest.Cells(fila, 4).Value = peso
         wsDest.Cells(fila, 4).NumberFormat = "0.00%"
+        wsDest.Cells(fila, 5).Value = 0
+        wsDest.Cells(fila, 5).NumberFormat = "0.00%"
         
         Dim acumulado As Double: acumulado = 1
-        For c = 3 To ultColC
+        Dim cc As Long
+        For cc = 1 To cols2026.Count
+            Dim colOrig As Long: colOrig = cols2026(cc)
             Dim vRet As Variant
-            vRet = wsCuadro.Cells(r, c).Value
+            vRet = wsCuadro.Cells(r, colOrig).Value
             If IsNumeric(vRet) And vRet <> "" Then
                 acumulado = acumulado * (1 + CDbl(vRet))
             End If
-            wsDest.Cells(fila, 4 + (c - 2)).Value = acumulado - 1
-            wsDest.Cells(fila, 4 + (c - 2)).NumberFormat = "0.00%"
-        Next c
+            wsDest.Cells(fila, 5 + cc).Value = acumulado - 1
+            wsDest.Cells(fila, 5 + cc).NumberFormat = "0.00%"
+        Next cc
         
         fila = fila + 1
 SiguienteFondo:
@@ -882,9 +586,6 @@ Private Sub GenerarGraficosPorTipo(wsBase As Worksheet, wsGraf As Worksheet, tip
         titulo = CStr(wsBase.Cells(r, 1).Value)
         
         If InStr(UCase(titulo), "RETORNO ACUMULADO") > 0 Then
-            Dim esLocal As Boolean
-            esLocal = (InStr(UCase(titulo), "LOCALES") > 0)
-            
             Dim filaEnc As Long: filaEnc = r + 1
             Dim filaInicioDatos As Long: filaInicioDatos = r + 2
             
@@ -921,11 +622,8 @@ Private Sub GenerarGraficosPorTipo(wsBase As Worksheet, wsGraf As Worksheet, tip
                     Dim listaFilas As Collection
                     Set listaFilas = porTipo(CStr(tipoIter))
                     
-                    Dim prefijo As String
-                    If esLocal Then prefijo = "LOCALES" Else prefijo = "EXTRANJEROS"
-                    
                     CrearGrafico wsBase, wsGraf, listaFilas, filaEnc, ultCol, _
-                                 prefijo & " - " & CStr(tipoIter), posicionGrafico
+                                 titulo & " - " & CStr(tipoIter), posicionGrafico
                     posicionGrafico = posicionGrafico + 1
                 Next tipoIter
             End If
@@ -960,6 +658,8 @@ Private Sub CrearGrafico(wsBase As Worksheet, wsGraf As Worksheet, _
         cht.SeriesCollection(1).Delete
     Loop
     
+    Dim colInicioDatos As Long: colInicioDatos = 5
+    
     Dim item As Variant
     For Each item In filasFondos
         Dim filaFondo As Long: filaFondo = CLng(item)
@@ -969,11 +669,11 @@ Private Sub CrearGrafico(wsBase As Worksheet, wsGraf As Worksheet, _
         Dim s As Series
         Set s = cht.SeriesCollection.NewSeries
         s.Name = nombreFondo
-        s.Values = wsBase.Range(wsBase.Cells(filaFondo, 4), wsBase.Cells(filaFondo, ultCol))
-        s.XValues = wsBase.Range(wsBase.Cells(filaEncabezados, 4), wsBase.Cells(filaEncabezados, ultCol))
+        s.Values = wsBase.Range(wsBase.Cells(filaFondo, colInicioDatos), wsBase.Cells(filaFondo, ultCol))
+        s.XValues = wsBase.Range(wsBase.Cells(filaEncabezados, colInicioDatos), wsBase.Cells(filaEncabezados, ultCol))
         
         Dim ultPunto As Long
-        ultPunto = ultCol - 4 + 1
+        ultPunto = ultCol - colInicioDatos + 1
         
         Dim p As Point
         Set p = s.Points(ultPunto)
@@ -985,7 +685,7 @@ Private Sub CrearGrafico(wsBase As Worksheet, wsGraf As Worksheet, _
     Next item
     
     Dim soloTipo As String
-    Dim posSep As Long: posSep = InStr(titulo, " - ")
+    Dim posSep As Long: posSep = InStrRev(titulo, " - ")
     If posSep > 0 Then
         soloTipo = Mid(titulo, posSep + 3)
     Else
@@ -1016,7 +716,7 @@ Private Sub CrearGrafico(wsBase As Worksheet, wsGraf As Worksheet, _
 End Sub
 
 '==================================================================
-' MACRO 5: Resumen Total con fórmulas dinámicas
+' MACRO 4: Resumen Total con fórmulas dinámicas
 '==================================================================
 Sub GenerarResumenTotal()
     
@@ -1347,6 +1047,234 @@ Private Function ConstruirFormulaYTD(tipo As String, origen As String, _
 End Function
 
 '==================================================================
+' MACRO 5: Pesos x Retornos
+' 4 secciones: LOCAL F2, LOCAL F3, EXTRANJERO F2, EXTRANJERO F3
+'==================================================================
+Sub GenerarPesosXRetornos()
+    
+    Dim wb As Workbook
+    Set wb = ThisWorkbook
+    
+    Dim wsCuadroLoc As Worksheet, wsCuadroExt As Worksheet, wsFondos As Worksheet, wsPesos As Worksheet
+    
+    On Error Resume Next
+    Set wsCuadroLoc = wb.Sheets("Cuadro Locales")
+    Set wsCuadroExt = wb.Sheets("Cuadro Extranjeros")
+    Set wsFondos = wb.Sheets("Fondos")
+    Set wsPesos = wb.Sheets("Pesos")
+    On Error GoTo 0
+    
+    If wsCuadroLoc Is Nothing Or wsCuadroExt Is Nothing _
+       Or wsFondos Is Nothing Or wsPesos Is Nothing Then
+        MsgBox "Faltan hojas necesarias.", vbCritical
+        Exit Sub
+    End If
+    
+    Application.ScreenUpdating = False
+    
+    Dim tipos As Object
+    Set tipos = LeerTiposFondos(wsFondos)
+    Dim vintages As Object
+    Set vintages = LeerVintageFondos(wsFondos)
+    Dim pesosF2 As Object, pesosF3 As Object
+    Set pesosF2 = LeerPesosDic25(wsPesos, "FONDO 2")
+    Set pesosF3 = LeerPesosDic25(wsPesos, "FONDO 3")
+    
+    Dim wsDest As Worksheet
+    Set wsDest = ObtenerHoja(wb, "Pesos x Retornos")
+    wsDest.Cells.Clear
+    
+    Dim fila As Long: fila = 1
+    
+    wsDest.Cells(fila, 1).Value = "LOCAL"
+    wsDest.Cells(fila, 1).Font.Bold = True
+    wsDest.Cells(fila, 1).Font.Size = 14
+    wsDest.Cells(fila, 1).Font.Underline = True
+    fila = fila + 2
+    
+    fila = ArmarBloquePxR(wsDest, fila, wsCuadroLoc, tipos, vintages, pesosF2, "Fondo 2")
+    fila = fila + 2
+    fila = ArmarBloquePxR(wsDest, fila, wsCuadroLoc, tipos, vintages, pesosF3, "Fondo 3")
+    fila = fila + 3
+    
+    wsDest.Cells(fila, 1).Value = "EXTRANJERO"
+    wsDest.Cells(fila, 1).Font.Bold = True
+    wsDest.Cells(fila, 1).Font.Size = 14
+    wsDest.Cells(fila, 1).Font.Underline = True
+    fila = fila + 2
+    
+    fila = ArmarBloquePxR(wsDest, fila, wsCuadroExt, tipos, vintages, pesosF2, "Fondo 2")
+    fila = fila + 2
+    fila = ArmarBloquePxR(wsDest, fila, wsCuadroExt, tipos, vintages, pesosF3, "Fondo 3")
+    
+    wsDest.Columns.AutoFit
+    wsDest.Activate
+    wsDest.Range("A1").Select
+    
+    Application.ScreenUpdating = True
+
+End Sub
+
+Private Function ArmarBloquePxR(wsDest As Worksheet, filaInicio As Long, _
+                                  wsCuadro As Worksheet, tipos As Object, _
+                                  vintages As Object, pesos As Object, _
+                                  nombreFondo As String) As Long
+    
+    Dim fila As Long: fila = filaInicio
+    
+    Dim ultColC As Long, ultFilaC As Long
+    ultColC = wsCuadro.Cells(1, wsCuadro.Columns.Count).End(xlToLeft).Column
+    ultFilaC = wsCuadro.Cells(wsCuadro.Rows.Count, 1).End(xlUp).Row
+    
+    Dim colsPer As Collection, encabsPer As Collection
+    Set colsPer = New Collection
+    Set encabsPer = New Collection
+    
+    Dim c As Long
+    For c = 3 To ultColC
+        Dim h As String
+        h = Trim(CStr(wsCuadro.Cells(1, c).Value))
+        If h <> "" Then
+            Dim a As Integer: a = 0
+            On Error Resume Next
+            If InStr(LCase(h), "q") = 1 Then
+                Dim pq() As String: pq = Split(h, "-")
+                If UBound(pq) >= 1 Then a = CInt(pq(1))
+            Else
+                Dim fch As Date
+                fch = DateValue("1-" & h)
+                If Err.Number = 0 Then a = Year(fch)
+            End If
+            Err.Clear
+            On Error GoTo 0
+            If a = 2026 Then
+                colsPer.Add c
+                encabsPer.Add h
+            End If
+        End If
+    Next c
+    
+    If colsPer.Count = 0 Then
+        wsDest.Cells(fila, 1).Value = nombreFondo & " (sin datos 2026)"
+        ArmarBloquePxR = fila + 1
+        Exit Function
+    End If
+    
+    wsDest.Cells(fila, 1).Value = nombreFondo
+    wsDest.Cells(fila, 1).Font.Bold = True
+    wsDest.Cells(fila, 1).Font.Size = 12
+    fila = fila + 1
+    
+    wsDest.Cells(fila, 1).Value = "Retornos 2026"
+    wsDest.Cells(fila, 2).Value = "Código SBS"
+    wsDest.Cells(fila, 3).Value = "Tipo"
+    wsDest.Cells(fila, 4).Value = "Vintage"
+    wsDest.Cells(fila, 5).Value = "Dic-25"
+    Dim k As Long
+    For k = 1 To encabsPer.Count
+        wsDest.Cells(fila, 5 + k).Value = encabsPer(k)
+    Next k
+    Dim ultColEnc As Long: ultColEnc = 5 + encabsPer.Count
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColEnc)).Font.Bold = True
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColEnc)).Interior.Color = RGB(180, 30, 30)
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColEnc)).Font.Color = RGB(255, 255, 255)
+    fila = fila + 1
+    
+    Dim filaInicioFondos As Long: filaInicioFondos = fila
+    
+    Dim ordenTipos As Collection
+    Set ordenTipos = New Collection
+    Dim vistosTipo As Object
+    Set vistosTipo = CreateObject("Scripting.Dictionary")
+    
+    Dim r As Long
+    For r = 2 To ultFilaC
+        Dim nombre As String, codigo As String, tipoF As String, vintage As String
+        nombre = Trim(CStr(wsCuadro.Cells(r, 1).Value))
+        codigo = Trim(CStr(wsCuadro.Cells(r, 2).Value))
+        
+        If codigo = "" Then GoTo SiguienteFondo
+        If Not pesos.exists(codigo) Then GoTo SiguienteFondo
+        
+        Dim peso As Double: peso = CDbl(pesos(codigo))
+        If peso = 0 Then GoTo SiguienteFondo
+        
+        tipoF = "Sin clasificar"
+        If tipos.exists(codigo) Then tipoF = tipos(codigo)
+        vintage = ""
+        If vintages.exists(codigo) Then vintage = CStr(vintages(codigo))
+        
+        If Not vistosTipo.exists(tipoF) Then
+            vistosTipo(tipoF) = 1
+            ordenTipos.Add tipoF
+        End If
+        
+        wsDest.Cells(fila, 1).Value = nombre
+        wsDest.Cells(fila, 2).Value = codigo
+        wsDest.Cells(fila, 3).Value = tipoF
+        wsDest.Cells(fila, 4).Value = vintage
+        wsDest.Cells(fila, 5).Value = 0
+        wsDest.Cells(fila, 5).NumberFormat = "0.00%"
+        
+        Dim cc As Long
+        For cc = 1 To colsPer.Count
+            Dim colOrig As Long: colOrig = colsPer(cc)
+            Dim vRet As Variant
+            vRet = wsCuadro.Cells(r, colOrig).Value
+            If IsNumeric(vRet) And vRet <> "" Then
+                wsDest.Cells(fila, 5 + cc).Value = CDbl(vRet) * peso
+                wsDest.Cells(fila, 5 + cc).NumberFormat = "0.00%"
+            Else
+                wsDest.Cells(fila, 5 + cc).Value = 0
+                wsDest.Cells(fila, 5 + cc).NumberFormat = "0.00%"
+            End If
+        Next cc
+        
+        fila = fila + 1
+SiguienteFondo:
+    Next r
+    
+    Dim filaFinFondos As Long: filaFinFondos = fila - 1
+    
+    If filaFinFondos < filaInicioFondos Then
+        ArmarBloquePxR = fila
+        Exit Function
+    End If
+    
+    wsDest.Cells(fila, 1).Value = "MTD"
+    wsDest.Cells(fila, 1).Font.Bold = True
+    wsDest.Cells(fila, 5).Formula = "=SUM(E" & filaInicioFondos & ":E" & filaFinFondos & ")"
+    wsDest.Cells(fila, 5).NumberFormat = "0.00%"
+    Dim col As Long
+    For col = 1 To colsPer.Count
+        Dim letraCol As String: letraCol = Columna(5 + col)
+        wsDest.Cells(fila, 5 + col).Formula = "=SUM(" & letraCol & filaInicioFondos & ":" & letraCol & filaFinFondos & ")"
+        wsDest.Cells(fila, 5 + col).NumberFormat = "0.00%"
+    Next col
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColEnc)).Font.Bold = True
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColEnc)).Interior.Color = RGB(220, 230, 200)
+    fila = fila + 1
+    
+    Dim tipoIter As Variant
+    For Each tipoIter In ordenTipos
+        wsDest.Cells(fila, 1).Value = CStr(tipoIter)
+        wsDest.Cells(fila, 1).Font.Bold = True
+        wsDest.Cells(fila, 5).Formula = "=SUMIF(C" & filaInicioFondos & ":C" & filaFinFondos & _
+                                          ",""" & CStr(tipoIter) & """,E" & filaInicioFondos & ":E" & filaFinFondos & ")"
+        wsDest.Cells(fila, 5).NumberFormat = "0.00%"
+        For col = 1 To colsPer.Count
+            Dim letraCol2 As String: letraCol2 = Columna(5 + col)
+            wsDest.Cells(fila, 5 + col).Formula = "=SUMIF(C" & filaInicioFondos & ":C" & filaFinFondos & _
+                                                    ",""" & CStr(tipoIter) & """," & letraCol2 & filaInicioFondos & ":" & letraCol2 & filaFinFondos & ")"
+            wsDest.Cells(fila, 5 + col).NumberFormat = "0.00%"
+        Next col
+        fila = fila + 1
+    Next tipoIter
+    
+    ArmarBloquePxR = fila
+End Function
+
+'==================================================================
 ' FUNCIONES PARA LEER FONDOS, PESOS Y ORIGEN
 '==================================================================
 
@@ -1415,6 +1343,59 @@ Private Function LeerOrigenFondos(ws As Worksheet) As Object
     Set LeerOrigenFondos = dic
 End Function
 
+Private Function LeerVintageFondos(ws As Worksheet) As Object
+    Dim dic As Object
+    Set dic = CreateObject("Scripting.Dictionary")
+    
+    Dim ultCol As Long, ultFila As Long
+    ultCol = ws.UsedRange.Columns.Count
+    ultFila = ws.UsedRange.Rows.Count
+    If ultCol < 1 Then ultCol = 20
+    If ultFila < 1 Then Set LeerVintageFondos = dic: Exit Function
+    
+    Dim filaEnc As Long: filaEnc = 0
+    Dim colCod As Long: colCod = 0
+    Dim colVintage As Long: colVintage = 0
+    
+    Dim r As Long, c As Long
+    For r = 1 To Application.WorksheetFunction.Min(ultFila, 20)
+        Dim tmpCod As Long, tmpVin As Long
+        tmpCod = 0: tmpVin = 0
+        For c = 1 To ultCol
+            Dim h As String
+            h = LCase(Replace(Trim(CStr(ws.Cells(r, c).Value)), " ", ""))
+            Select Case h
+                Case "códigosbs", "codigosbs", "código", "codigo": tmpCod = c
+                Case "vintage", "año", "year": tmpVin = c
+            End Select
+        Next c
+        If tmpCod > 0 Then
+            colCod = tmpCod
+            colVintage = tmpVin
+            filaEnc = r
+            Exit For
+        End If
+    Next r
+    
+    If filaEnc = 0 Or colVintage = 0 Then
+        Set LeerVintageFondos = dic
+        Exit Function
+    End If
+    
+    Dim ultFilaReal As Long
+    ultFilaReal = ws.Cells(ws.Rows.Count, colCod).End(xlUp).Row
+    
+    Dim i As Long
+    For i = filaEnc + 1 To ultFilaReal
+        Dim cod As String, vin As String
+        cod = Trim(CStr(ws.Cells(i, colCod).Value))
+        vin = Trim(CStr(ws.Cells(i, colVintage).Value))
+        If cod <> "" Then dic(cod) = vin
+    Next i
+    
+    Set LeerVintageFondos = dic
+End Function
+
 Private Function DetectarFilaEncabezadoFondos(ws As Worksheet, _
                                                 ByRef colCod As Long, _
                                                 ByRef colTipo As Long, _
@@ -1473,7 +1454,6 @@ Private Function LeerPesosDic25(ws As Worksheet, etiqueta As String) As Object
     If ultCol < 10 Then ultCol = 30
     If ultFila < 100 Then ultFila = 300
     
-    ' Buscar etiqueta "FONDO 2" o "FONDO 3" en TODA la hoja
     Dim filaEtiqueta As Long: filaEtiqueta = 0
     Dim colEtiqueta As Long: colEtiqueta = 0
     
@@ -1491,7 +1471,6 @@ Private Function LeerPesosDic25(ws As Worksheet, etiqueta As String) As Object
     
     If filaEtiqueta = 0 Then Set LeerPesosDic25 = dic: Exit Function
     
-    ' Buscar "Código SBS" y "Dic-25" hasta 10 filas abajo de la etiqueta
     Dim filaEnc As Long: filaEnc = 0
     Dim colCod As Long: colCod = 0
     Dim colDic As Long: colDic = 0
