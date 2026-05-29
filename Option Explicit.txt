@@ -427,7 +427,7 @@ Private Sub ArmarCuadro(wsResumen As Worksheet, wsData As Worksheet, _
 End Sub
 
 '==================================================================
-' MACRO 3: Base 100 - 4 cuadros separados
+' MACRO 3: Base 100
 '==================================================================
 Sub GenerarBase100YGraficos()
     
@@ -551,13 +551,19 @@ Private Function ArmarTablaBase100(wsDest As Worksheet, filaInicio As Long, _
     wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColTot)).Font.Color = RGB(255, 255, 255)
     fila = fila + 1
     
+    wsDest.Cells(fila, 1).NumberFormat = "@"
     wsDest.Cells(fila, 1).Value = "Retornos 2026"
+    wsDest.Cells(fila, 2).NumberFormat = "@"
     wsDest.Cells(fila, 2).Value = "Código SBS"
+    wsDest.Cells(fila, 3).NumberFormat = "@"
     wsDest.Cells(fila, 3).Value = "Tipo"
+    wsDest.Cells(fila, 4).NumberFormat = "@"
     wsDest.Cells(fila, 4).Value = "Peso Dic-25"
+    wsDest.Cells(fila, 5).NumberFormat = "@"
     wsDest.Cells(fila, 5).Value = "Dic-25"
     Dim k As Long
     For k = 1 To encabs2026.Count
+        wsDest.Cells(fila, 5 + k).NumberFormat = "@"
         wsDest.Cells(fila, 5 + k).Value = encabs2026(k)
     Next k
     wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColTot)).Font.Bold = True
@@ -767,7 +773,7 @@ Private Sub CrearGrafico(wsBase As Worksheet, wsGraf As Worksheet, _
 End Sub
 
 '==================================================================
-' MACRO 4: Pesos x Retornos
+' MACRO 4: Pesos x Retornos (encabezados forzados a texto)
 '==================================================================
 Sub GenerarPesosXRetornos()
     
@@ -891,15 +897,24 @@ Private Function ArmarBloquePxR(wsDest As Worksheet, filaInicio As Long, _
     wsDest.Cells(fila, 1).Font.Size = 12
     fila = fila + 1
     
+    ' Encabezados - FORZAR FORMATO TEXTO antes de escribir cada uno
+    wsDest.Cells(fila, 1).NumberFormat = "@"
     wsDest.Cells(fila, 1).Value = "Retornos 2026"
+    wsDest.Cells(fila, 2).NumberFormat = "@"
     wsDest.Cells(fila, 2).Value = "Código SBS"
+    wsDest.Cells(fila, 3).NumberFormat = "@"
     wsDest.Cells(fila, 3).Value = "Tipo"
+    wsDest.Cells(fila, 4).NumberFormat = "@"
     wsDest.Cells(fila, 4).Value = "Vintage"
+    wsDest.Cells(fila, 5).NumberFormat = "@"
     wsDest.Cells(fila, 5).Value = "Dic-25"
+    
     Dim k As Long
     For k = 1 To encabsPer.Count
+        wsDest.Cells(fila, 5 + k).NumberFormat = "@"
         wsDest.Cells(fila, 5 + k).Value = encabsPer(k)
     Next k
+    
     Dim ultColEnc As Long: ultColEnc = 5 + encabsPer.Count
     wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColEnc)).Font.Bold = True
     wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, ultColEnc)).Interior.Color = RGB(180, 30, 30)
@@ -977,7 +992,7 @@ SiguienteFondo:
         Exit Function
     End If
     
-    ' MTD (suma total)
+    ' MTD
     wsDest.Cells(fila, 1).Value = "MTD"
     wsDest.Cells(fila, 1).Font.Bold = True
     wsDest.Cells(fila, 5).Formula = "=SUM(E" & filaInicioFondos & ":E" & filaFinFondos & ")"
@@ -1013,7 +1028,7 @@ SiguienteFondo:
 End Function
 
 '==================================================================
-' MACRO 5: Resumen Total (NUEVA LÓGICA - lee de "Pesos x Retornos")
+' MACRO 5: Resumen Total (CALCULA VALORES DIRECTOS desde Pesos x Retornos)
 '==================================================================
 Sub GenerarResumenTotal()
     
@@ -1044,7 +1059,6 @@ Sub GenerarResumenTotal()
     
     wsDest.Range("B1").NumberFormat = "@"
     
-    ' Buscar último mes con datos como default
     Dim mesDefault As String: mesDefault = "mar-26"
     Dim listaMeses As String: listaMeses = ""
     
@@ -1084,11 +1098,10 @@ Sub GenerarResumenTotal()
         End With
     End If
     
-    ' Construir bloques FONDO 2 y FONDO 3
     Dim filaActual As Long: filaActual = 3
-    filaActual = ArmarBloqueResumen(wsDest, filaActual, wsPxR, "FONDO 2", "Fondo 2")
+    filaActual = ArmarBloqueResumen(wsDest, filaActual, wsPxR, "FONDO 2", "Fondo 2", mesDefault)
     filaActual = filaActual + 2
-    filaActual = ArmarBloqueResumen(wsDest, filaActual, wsPxR, "FONDO 3", "Fondo 3")
+    filaActual = ArmarBloqueResumen(wsDest, filaActual, wsPxR, "FONDO 3", "Fondo 3", mesDefault)
     
     wsDest.Columns("A:D").AutoFit
     wsDest.Activate
@@ -1098,23 +1111,17 @@ Sub GenerarResumenTotal()
 
 End Sub
 
-'==================================================================
-' Arma un bloque del Resumen Total leyendo de Pesos x Retornos
-'==================================================================
 Private Function ArmarBloqueResumen(wsDest As Worksheet, filaInicio As Long, _
                                      wsPxR As Worksheet, _
                                      nombreFondoDisplay As String, _
-                                     etiquetaFondoPxR As String) As Long
+                                     etiquetaFondoPxR As String, _
+                                     mesSel As String) As Long
     
     Dim fila As Long: fila = filaInicio
     
-    ' Localizar las dos secciones en Pesos x Retornos: LOCAL/etiquetaFondoPxR y EXTRANJERO/etiquetaFondoPxR
     Dim infoLoc As String, infoExt As String
     infoLoc = LocalizarSeccionPxR(wsPxR, "LOCAL", etiquetaFondoPxR)
     infoExt = LocalizarSeccionPxR(wsPxR, "EXTRANJERO", etiquetaFondoPxR)
-    
-    ' Parsing: "filaEnc|colDic25|colUltMes|filaMTD|filaPE|filaInfr|filaRE|filaPD|filaPESec|filaPEFoF"
-    ' En realidad guardamos: "filaEnc|colDic25|colUltMes|filaMTD|tipos..."
     
     If infoLoc = "" And infoExt = "" Then
         wsDest.Cells(fila, 1).Value = nombreFondoDisplay & " (no se encontró sección)"
@@ -1122,7 +1129,6 @@ Private Function ArmarBloqueResumen(wsDest As Worksheet, filaInicio As Long, _
         Exit Function
     End If
     
-    ' Título FONDO X
     wsDest.Cells(fila, 1).Value = nombreFondoDisplay
     wsDest.Cells(fila, 1).Font.Bold = True
     wsDest.Cells(fila, 1).Font.Size = 14
@@ -1138,17 +1144,12 @@ Private Function ArmarBloqueResumen(wsDest As Worksheet, filaInicio As Long, _
     
     Dim filaLocalTotal As Long: filaLocalTotal = 0
     Dim filaExtTotal As Long: filaExtTotal = 0
-    Dim filasSubtotalesLoc As Collection
-    Dim filasSubtotalesExt As Collection
-    Set filasSubtotalesLoc = New Collection
-    Set filasSubtotalesExt = New Collection
     
-    ' LOCAL
     If infoLoc <> "" Then
         filaLocalTotal = fila
         fila = fila + 1
         Dim primeraFilaLoc As Long: primeraFilaLoc = fila
-        fila = EscribirTiposBloque(wsDest, fila, wsPxR, infoLoc, filasSubtotalesLoc)
+        fila = EscribirTiposBloque(wsDest, fila, wsPxR, infoLoc, mesSel)
         Dim ultimaFilaLoc As Long: ultimaFilaLoc = fila - 1
         
         wsDest.Cells(filaLocalTotal, 1).Value = "LOCAL TOTAL"
@@ -1163,12 +1164,11 @@ Private Function ArmarBloqueResumen(wsDest As Worksheet, filaInicio As Long, _
         fila = fila + 1
     End If
     
-    ' EXTRANJERO
     If infoExt <> "" Then
         filaExtTotal = fila
         fila = fila + 1
         Dim primeraFilaExt As Long: primeraFilaExt = fila
-        fila = EscribirTiposBloque(wsDest, fila, wsPxR, infoExt, filasSubtotalesExt)
+        fila = EscribirTiposBloque(wsDest, fila, wsPxR, infoExt, mesSel)
         Dim ultimaFilaExt As Long: ultimaFilaExt = fila - 1
         
         wsDest.Cells(filaExtTotal, 1).Value = "EXTRANJERO TOTAL"
@@ -1183,7 +1183,6 @@ Private Function ArmarBloqueResumen(wsDest As Worksheet, filaInicio As Long, _
         fila = fila + 1
     End If
     
-    ' TOTAL FONDO X = Local Total + Extranjero Total
     fila = fila + 1
     wsDest.Cells(fila, 1).Value = "TOTAL " & nombreFondoDisplay
     Dim formMtd As String, formYtd As String
@@ -1210,11 +1209,6 @@ Private Function ArmarBloqueResumen(wsDest As Worksheet, filaInicio As Long, _
     ArmarBloqueResumen = fila
 End Function
 
-'==================================================================
-' Localiza la sección "LOCAL/Fondo X" o "EXTRANJERO/Fondo X" en Pesos x Retornos
-' Devuelve: "filaEnc|colDic25|colUltMes|filaMTD|tipos_filas..."
-' Si no encuentra, devuelve ""
-'==================================================================
 Private Function LocalizarSeccionPxR(wsPxR As Worksheet, _
                                       origenBuscar As String, _
                                       fondoBuscar As String) As String
@@ -1222,7 +1216,6 @@ Private Function LocalizarSeccionPxR(wsPxR As Worksheet, _
     Dim ultFila As Long
     ultFila = wsPxR.Cells(wsPxR.Rows.Count, 1).End(xlUp).Row
     
-    ' Buscar la sección de origen (LOCAL o EXTRANJERO)
     Dim filaOrigen As Long: filaOrigen = 0
     Dim r As Long
     For r = 1 To ultFila
@@ -1237,7 +1230,6 @@ Private Function LocalizarSeccionPxR(wsPxR As Worksheet, _
         Exit Function
     End If
     
-    ' Buscar dónde termina la sección (siguiente "LOCAL" o "EXTRANJERO")
     Dim filaFinSeccion As Long: filaFinSeccion = ultFila
     For r = filaOrigen + 1 To ultFila
         Dim val As String: val = UCase(Trim(CStr(wsPxR.Cells(r, 1).Value)))
@@ -1247,7 +1239,6 @@ Private Function LocalizarSeccionPxR(wsPxR As Worksheet, _
         End If
     Next r
     
-    ' Buscar "Fondo 2" o "Fondo 3" dentro de esa sección
     Dim filaFondo As Long: filaFondo = 0
     For r = filaOrigen + 1 To filaFinSeccion
         If LCase(Trim(CStr(wsPxR.Cells(r, 1).Value))) = LCase(fondoBuscar) Then
@@ -1261,15 +1252,12 @@ Private Function LocalizarSeccionPxR(wsPxR As Worksheet, _
         Exit Function
     End If
     
-    ' Fila encabezados = filaFondo + 1
     Dim filaEnc As Long: filaEnc = filaFondo + 1
     
-    ' Detectar colDic25 y colUltMes
     Dim ultCol As Long
     ultCol = wsPxR.Cells(filaEnc, wsPxR.Columns.Count).End(xlToLeft).Column
     
     Dim colDic25 As Long: colDic25 = 0
-    Dim colUltMes As Long: colUltMes = ultCol
     Dim c As Long
     For c = 5 To ultCol
         Dim h As String: h = LCase(Trim(CStr(wsPxR.Cells(filaEnc, c).Value)))
@@ -1278,7 +1266,6 @@ Private Function LocalizarSeccionPxR(wsPxR As Worksheet, _
     
     If colDic25 = 0 Then colDic25 = 5
     
-    ' Buscar fila "MTD" después de los fondos
     Dim filaMTD As Long: filaMTD = 0
     For r = filaEnc + 1 To filaFinSeccion
         If UCase(Trim(CStr(wsPxR.Cells(r, 1).Value))) = "MTD" Then
@@ -1292,7 +1279,6 @@ Private Function LocalizarSeccionPxR(wsPxR As Worksheet, _
         Exit Function
     End If
     
-    ' Recolectar filas de subtotales por tipo (después de MTD, hasta línea vacía o siguiente FondoX)
     Dim tiposInfo As String: tiposInfo = ""
     For r = filaMTD + 1 To filaFinSeccion
         Dim etiqueta As String: etiqueta = Trim(CStr(wsPxR.Cells(r, 1).Value))
@@ -1301,15 +1287,12 @@ Private Function LocalizarSeccionPxR(wsPxR As Worksheet, _
         tiposInfo = tiposInfo & ";" & etiqueta & ":" & r
     Next r
     
-    LocalizarSeccionPxR = filaEnc & "|" & colDic25 & "|" & colUltMes & "|" & filaMTD & tiposInfo
+    LocalizarSeccionPxR = filaEnc & "|" & colDic25 & "|" & ultCol & "|" & filaMTD & tiposInfo
 End Function
 
-'==================================================================
-' Escribe los tipos en el Resumen leyendo de los subtotales de Pesos x Retornos
-'==================================================================
 Private Function EscribirTiposBloque(wsDest As Worksheet, filaInicio As Long, _
                                       wsPxR As Worksheet, info As String, _
-                                      filasOut As Collection) As Long
+                                      mesSel As String) As Long
     Dim fila As Long: fila = filaInicio
     
     Dim partes() As String
@@ -1321,15 +1304,11 @@ Private Function EscribirTiposBloque(wsDest As Worksheet, filaInicio As Long, _
     Dim subpartes() As String
     subpartes = Split(partes(3), ";")
     
-    ' Leer mes seleccionado de B1
-    Dim mesSeleccionado As String
-    mesSeleccionado = Trim(CStr(wsDest.Range("B1").Value))
-    
     ' Buscar la columna del mes seleccionado en los encabezados de PxR
     Dim colMesSel As Long: colMesSel = 0
     Dim c As Long
     For c = colDic25 To colUltMes
-        If LCase(Trim(CStr(wsPxR.Cells(filaEnc, c).Value))) = LCase(mesSeleccionado) Then
+        If LCase(Trim(CStr(wsPxR.Cells(filaEnc, c).Value))) = LCase(mesSel) Then
             colMesSel = c
             Exit For
         End If
@@ -1383,6 +1362,7 @@ Private Function EscribirTiposBloque(wsDest As Worksheet, filaInicio As Long, _
     
     EscribirTiposBloque = fila
 End Function
+
 '==================================================================
 ' FUNCIONES PARA LEER FONDOS, PESOS Y ORIGEN
 '==================================================================
@@ -1613,7 +1593,6 @@ Private Function LeerPesosDic25(ws As Worksheet, etiqueta As String) As Object
     ultCol = 50
     ultFila = 300
     
-    ' PASO 1: Buscar "% de Cartera" para saltar bloque de montos
     Dim filaInicioBusqueda As Long: filaInicioBusqueda = 1
     
     Dim r As Long, c As Long
@@ -1633,7 +1612,6 @@ Private Function LeerPesosDic25(ws As Worksheet, etiqueta As String) As Object
     
     If filaInicioBusqueda = 1 Then filaInicioBusqueda = 70
     
-    ' PASO 2: Buscar etiqueta FONDO X
     Dim filaEtiqueta As Long: filaEtiqueta = 0
     Dim colEtiqueta As Long: colEtiqueta = 0
     
@@ -1652,7 +1630,6 @@ Private Function LeerPesosDic25(ws As Worksheet, etiqueta As String) As Object
     
     If filaEtiqueta = 0 Then Set LeerPesosDic25 = dic: Exit Function
     
-    ' PASO 3: Detectar fin del bloque
     Dim colFinBloque As Long: colFinBloque = ultCol
     Dim rEnc As Long
     For rEnc = filaEtiqueta To filaEtiqueta + 3
@@ -1669,7 +1646,6 @@ Private Function LeerPesosDic25(ws As Worksheet, etiqueta As String) As Object
         If colFinBloque < ultCol Then Exit For
     Next rEnc
     
-    ' PASO 4: Buscar Código SBS y Dic-25
     Dim filaEnc As Long: filaEnc = 0
     Dim colCod As Long: colCod = 0
     Dim colDic As Long: colDic = 0
@@ -1709,7 +1685,6 @@ Private Function LeerPesosDic25(ws As Worksheet, etiqueta As String) As Object
     
     If colCod = 0 Or colDic = 0 Then Set LeerPesosDic25 = dic: Exit Function
     
-    ' PASO 5: Leer fondos
     Dim i As Long
     For i = filaEnc + 1 To ultFila
         On Error Resume Next
@@ -1823,215 +1798,4 @@ Sub DiagnosticoPesos()
     Next k
     
     MsgBox msj, vbInformation, "Diagnóstico Pesos"
-End Sub
-
-Sub VerFormulaYTD()
-    Dim wsPxR As Worksheet
-    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
-    
-    Dim info As String
-    info = LocalizarSeccionPxR(wsPxR, "LOCAL", "Fondo 2")
-    
-    If info = "" Then
-        MsgBox "No se encontró sección LOCAL / Fondo 2"
-        Exit Sub
-    End If
-    
-    Dim partes() As String
-    partes = Split(info, "|")
-    Dim filaEnc As Long: filaEnc = CLng(partes(0))
-    Dim colDic25 As Long: colDic25 = CLng(partes(1))
-    Dim colUltMes As Long: colUltMes = CLng(partes(2))
-    
-    Dim subpartes() As String
-    subpartes = Split(partes(3), ";")
-    
-    Dim primerMesCol As Long: primerMesCol = colDic25 + 1
-    Dim nombreHojaPxR As String
-    nombreHojaPxR = "'" & wsPxR.Name & "'"
-    
-    ' Tomar el primer tipo para mostrar la fórmula
-    If UBound(subpartes) >= 1 Then
-        Dim sp() As String
-        sp = Split(subpartes(1), ":")
-        Dim filaTipoPxR As Long: filaTipoPxR = CLng(sp(1))
-        
-        Dim rangoEncab As String
-        rangoEncab = nombreHojaPxR & "!" & Columna(colDic25) & filaEnc & ":" & _
-                     Columna(colUltMes) & filaEnc
-        
-        Dim formYtd As String
-        formYtd = "=IFERROR(IF(MATCH($B$1," & rangoEncab & ",0)<=1,0," & _
-                  "PRODUCT(1+OFFSET(" & nombreHojaPxR & "!" & _
-                  Columna(primerMesCol) & filaTipoPxR & ",0,0,1," & _
-                  "MATCH($B$1," & rangoEncab & ",0)-1))-1),0)"
-        
-        Dim msj As String
-        msj = "Fila encabezados PxR: " & filaEnc & vbCrLf
-        msj = msj & "Col Dic-25: " & Columna(colDic25) & vbCrLf
-        msj = msj & "Col Ult Mes: " & Columna(colUltMes) & vbCrLf
-        msj = msj & "Fila Tipo (primer subtotal): " & filaTipoPxR & vbCrLf & vbCrLf
-        msj = msj & "FÓRMULA YTD:" & vbCrLf & vbCrLf
-        msj = msj & formYtd
-        
-        MsgBox msj, vbInformation, "Diagnóstico YTD"
-    End If
-End Sub
-
-Sub VerFormulasFalladas()
-    Dim wsResumen As Worksheet
-    Set wsResumen = ThisWorkbook.Sheets("Resumen Total")
-    
-    Dim wsPxR As Worksheet
-    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
-    
-    ' Reconstruir info LOCAL Fondo 2
-    Dim info As String
-    info = LocalizarSeccionPxR(wsPxR, "LOCAL", "Fondo 2")
-    
-    If info = "" Then
-        MsgBox "No se encontró sección"
-        Exit Sub
-    End If
-    
-    Dim partes() As String
-    partes = Split(info, "|")
-    Dim filaEnc As Long: filaEnc = CLng(partes(0))
-    Dim colDic25 As Long: colDic25 = CLng(partes(1))
-    Dim colUltMes As Long: colUltMes = CLng(partes(2))
-    
-    Dim subpartes() As String
-    subpartes = Split(partes(3), ";")
-    
-    Dim msj As String
-    msj = "Encabezados PxR fila: " & filaEnc & vbCrLf
-    msj = msj & "Col Dic-25: " & Columna(colDic25) & " (num " & colDic25 & ")" & vbCrLf
-    msj = msj & "Col Ult Mes: " & Columna(colUltMes) & " (num " & colUltMes & ")" & vbCrLf & vbCrLf
-    
-    Dim primerMesCol As Long: primerMesCol = colDic25 + 1
-    msj = msj & "Primer mes col: " & Columna(primerMesCol) & " (num " & primerMesCol & ")" & vbCrLf & vbCrLf
-    
-    msj = msj & "TIPOS DETECTADOS:" & vbCrLf
-    
-    Dim nombreHojaPxR As String
-    nombreHojaPxR = "'" & wsPxR.Name & "'"
-    
-    Dim i As Long
-    For i = 1 To UBound(subpartes)
-        If subpartes(i) <> "" Then
-            Dim sp() As String
-            sp = Split(subpartes(i), ":")
-            If UBound(sp) >= 1 Then
-                Dim tipo As String: tipo = sp(0)
-                Dim filaTipoPxR As Long: filaTipoPxR = CLng(sp(1))
-                msj = msj & "  '" & tipo & "' -> fila " & filaTipoPxR & vbCrLf
-                
-                ' Probar leer un valor de esa fila para confirmar
-                Dim valPrueba As Variant
-                valPrueba = wsPxR.Cells(filaTipoPxR, primerMesCol).Value
-                msj = msj & "    Valor en " & Columna(primerMesCol) & filaTipoPxR & ": " & valPrueba & vbCrLf
-            End If
-        End If
-    Next i
-    
-    MsgBox msj, vbInformation, "Debug YTD"
-End Sub
-
-Sub DiagnosticoLocalizacionPxR()
-    Dim wsPxR As Worksheet
-    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
-    
-    Dim msj As String
-    msj = "=== HOJA: '" & wsPxR.Name & "' ===" & vbCrLf & vbCrLf
-    
-    ' Buscar "LOCAL" en columna A
-    Dim filaLocal As Long: filaLocal = 0
-    Dim ultFila As Long
-    ultFila = wsPxR.Cells(wsPxR.Rows.Count, 1).End(xlUp).Row
-    msj = msj & "Última fila con datos: " & ultFila & vbCrLf & vbCrLf
-    
-    Dim r As Long
-    For r = 1 To ultFila
-        Dim v As String
-        v = UCase(Trim(CStr(wsPxR.Cells(r, 1).Value)))
-        If v = "LOCAL" Then
-            filaLocal = r
-            Exit For
-        End If
-    Next r
-    
-    msj = msj & "Fila 'LOCAL' encontrada en: " & filaLocal & vbCrLf
-    
-    ' Buscar "Fondo 2" después de LOCAL
-    Dim filaFondo2 As Long: filaFondo2 = 0
-    For r = filaLocal + 1 To ultFila
-        If LCase(Trim(CStr(wsPxR.Cells(r, 1).Value))) = "fondo 2" Then
-            filaFondo2 = r
-            Exit For
-        End If
-    Next r
-    
-    msj = msj & "Fila 'Fondo 2' encontrada en: " & filaFondo2 & vbCrLf
-    
-    If filaFondo2 = 0 Then
-        MsgBox msj, vbCritical
-        Exit Sub
-    End If
-    
-    ' Fila encabezados = filaFondo2 + 1
-    Dim filaEnc As Long: filaEnc = filaFondo2 + 1
-    msj = msj & "Fila encabezados: " & filaEnc & vbCrLf & vbCrLf
-    
-    ' Mostrar el contenido de la fila encabezados
-    Dim ultCol As Long
-    ultCol = wsPxR.Cells(filaEnc, wsPxR.Columns.Count).End(xlToLeft).Column
-    msj = msj & "Última columna en fila encabezados: " & ultCol & " (" & Columna(ultCol) & ")" & vbCrLf & vbCrLf
-    
-    msj = msj & "Contenido fila encabezados:" & vbCrLf
-    Dim c As Long
-    For c = 1 To ultCol
-        Dim val As String
-        val = CStr(wsPxR.Cells(filaEnc, c).Value)
-        If val <> "" Then
-            msj = msj & "  " & Columna(c) & filaEnc & " = '" & val & "'" & vbCrLf
-        End If
-    Next c
-    
-    ' Buscar fila MTD
-    msj = msj & vbCrLf & "Filas siguientes (buscando MTD y tipos):" & vbCrLf
-    Dim cnt As Long: cnt = 0
-    For r = filaEnc + 1 To ultFila
-        Dim et As String
-        et = Trim(CStr(wsPxR.Cells(r, 1).Value))
-        If et <> "" Then
-            cnt = cnt + 1
-            msj = msj & "  Fila " & r & ": '" & et & "'" & vbCrLf
-            If cnt >= 15 Then Exit For
-        End If
-        If LCase(et) = "fondo 2" Or LCase(et) = "fondo 3" Then Exit For
-    Next r
-    
-    MsgBox msj, vbInformation, "Diagnóstico PxR"
-End Sub
-
-Sub DiagnosticoPxR2()
-    Dim wsPxR As Worksheet
-    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
-    
-    Dim msj As String
-    msj = "Lectura BRUTA de las primeras filas de Pesos x Retornos:" & vbCrLf & vbCrLf
-    
-    Dim r As Long, c As Long
-    For r = 1 To 6
-        msj = msj & "Fila " & r & ": "
-        For c = 1 To 12
-            Dim val As String
-            val = CStr(wsPxR.Cells(r, c).Value)
-            If Len(val) > 15 Then val = Left(val, 15)
-            msj = msj & "[" & Columna(c) & ":" & val & "] "
-        Next c
-        msj = msj & vbCrLf
-    Next r
-    
-    MsgBox msj, vbInformation, "Lectura PxR"
 End Sub
