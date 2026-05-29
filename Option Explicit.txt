@@ -1318,16 +1318,13 @@ Private Function EscribirTiposBloque(wsDest As Worksheet, filaInicio As Long, _
     Dim colDic25 As Long: colDic25 = CLng(partes(1))
     Dim colUltMes As Long: colUltMes = CLng(partes(2))
     
-    ' partes(4) en adelante son ";tipo:fila;tipo:fila..." pero como split por "|" da el restante ya unido con ";"
-    ' Mejor: tomar substring después del 4to "|" no aplica; en realidad después de filaMTD (índice 3) viene ";tipos..."
-    ' partes(3) tiene "filaMTD;Tipo:fila;Tipo:fila..." porque la concatenación fue: filaMTD & ";Tipo:fila..."
-    
     Dim subpartes() As String
     subpartes = Split(partes(3), ";")
     
-    ' subpartes(0) = filaMTD; subpartes(1)... = "Tipo:fila"
     Dim nombreHojaPxR As String
     nombreHojaPxR = "'" & wsPxR.Name & "'"
+    
+    Dim primerMesCol As Long: primerMesCol = colDic25 + 1
     
     Dim i As Long
     For i = 1 To UBound(subpartes)
@@ -1341,7 +1338,7 @@ Private Function EscribirTiposBloque(wsDest As Worksheet, filaInicio As Long, _
                 
                 wsDest.Cells(fila, 1).Value = "  " & tipo
                 
-                ' MTD: INDEX/MATCH del mes seleccionado en B1
+                ' MTD: INDEX/MATCH del mes seleccionado
                 Dim formMtd As String
                 formMtd = "=IFERROR(INDEX(" & nombreHojaPxR & "!" & _
                           Columna(colDic25) & filaTipoPxR & ":" & Columna(colUltMes) & filaTipoPxR & "," & _
@@ -1350,16 +1347,22 @@ Private Function EscribirTiposBloque(wsDest As Worksheet, filaInicio As Long, _
                 wsDest.Cells(fila, 2).Formula = formMtd
                 wsDest.Cells(fila, 2).NumberFormat = "0.00%"
                 
-                ' YTD: producto compuesto desde primera columna hasta mes seleccionado
-                ' Usamos SUMPRODUCT con LN o mejor: PRODUCT((1+rangos))-1 limitado por columna
-                ' Truco: SUMPRODUCT((1+rango)*(COLUMNA<=MATCH))-COUNT(rango)... mejor usar fórmula matricial
-                ' Solución más simple: PRODUCT con OFFSET
-                Dim primerMesCol As Long: primerMesCol = colDic25 + 1  ' Ene-26 (Dic-25 no cuenta)
+                ' YTD: PRODUCT(1+OFFSET(...)) - 1
+                ' Empezamos en Ene-26 y tomamos N meses donde N = posición del mes seleccionado en lista de meses (sin Dic-25)
+                ' MATCH busca posición desde Dic-25, así que mar-26 = posición 4 (Dic, Ene, Feb, Mar)
+                ' Pero queremos contar desde Ene-26, así que N = MATCH - 1
+                ' Si seleccionas Dic-25 (mes 1), N = 0 → no debería compoundear nada
+                
+                Dim rangoEncab As String
+                rangoEncab = nombreHojaPxR & "!" & Columna(colDic25) & filaEnc & ":" & _
+                             Columna(colUltMes) & filaEnc
+                
                 Dim formYtd As String
-                formYtd = "=IFERROR(PRODUCT(1+OFFSET(" & nombreHojaPxR & "!" & _
+                formYtd = "=IFERROR(IF(MATCH($B$1," & rangoEncab & ",0)<=1,0," & _
+                          "PRODUCT(1+OFFSET(" & nombreHojaPxR & "!" & _
                           Columna(primerMesCol) & filaTipoPxR & ",0,0,1," & _
-                          "MATCH($B$1," & nombreHojaPxR & "!" & _
-                          Columna(colDic25) & filaEnc & ":" & Columna(colUltMes) & filaEnc & ",0)-1))-1,0)"
+                          "MATCH($B$1," & rangoEncab & ",0)-1))-1),0)"
+                
                 wsDest.Cells(fila, 3).Formula = formYtd
                 wsDest.Cells(fila, 3).NumberFormat = "0.00%"
                 
@@ -1370,7 +1373,6 @@ Private Function EscribirTiposBloque(wsDest As Worksheet, filaInicio As Long, _
     
     EscribirTiposBloque = fila
 End Function
-
 '==================================================================
 ' FUNCIONES PARA LEER FONDOS, PESOS Y ORIGEN
 '==================================================================
