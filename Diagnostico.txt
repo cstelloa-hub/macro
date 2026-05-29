@@ -1,68 +1,43 @@
-Sub DiagnosticoEncabezadosPesos()
+Sub DiagnosticoRapido()
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("Pesos")
     
-    Dim ultCol As Long, ultFila As Long
-    ultCol = ws.Columns.Count
-    ultFila = 300
-    
-    ' Buscar FONDO 2
+    ' Buscar FONDO 2 SOLO en columnas A-Z y filas 1-150
     Dim filaF2 As Long: filaF2 = 0
     Dim colF2 As Long: colF2 = 0
     Dim r As Long, c As Long
-    For r = 1 To ultFila
-        For c = 1 To 50
-            On Error Resume Next
-            Dim valBusq As String
-            valBusq = UCase(Trim(CStr(ws.Cells(r, c).Value)))
-            On Error GoTo 0
-            If valBusq = "FONDO 2" Then
-                filaF2 = r: colF2 = c: Exit For
+    
+    For r = 60 To 150
+        For c = 1 To 26
+            If UCase(Trim(CStr(ws.Cells(r, c).Value))) = "FONDO 2" Then
+                filaF2 = r
+                colF2 = c
+                Exit For
             End If
         Next c
         If filaF2 > 0 Then Exit For
     Next r
     
-    Dim msj As String
     If filaF2 = 0 Then
-        MsgBox "NO se encontró 'FONDO 2'", vbCritical
+        MsgBox "NO se encontró 'FONDO 2' en filas 60-150", vbCritical
         Exit Sub
     End If
     
-    msj = "FONDO 2 está en celda: " & Columna(colF2) & filaF2 & vbCrLf & vbCrLf
-    msj = msj & "Contenido de las filas siguientes:" & vbCrLf & vbCrLf
+    Dim msj As String
+    msj = "FONDO 2 está en fila " & filaF2 & ", columna " & colF2 & vbCrLf & vbCrLf
     
-    Dim colFin As Long: colFin = colF2 + 8
-    If colFin > 100 Then colFin = 100
-    
+    ' Mostrar las 3 filas siguientes, 7 columnas a la derecha
     Dim rr As Long, cc As Long
-    For rr = filaF2 To filaF2 + 5
-        msj = msj & "Fila " & rr & ":" & vbCrLf
-        For cc = colF2 To colFin
-            Dim valRaw As Variant
+    For rr = filaF2 To filaF2 + 3
+        msj = msj & "Fila " & rr & ": "
+        For cc = colF2 To colF2 + 6
             Dim val As String
-            Dim tipoVal As String
-            
-            On Error Resume Next
-            valRaw = ws.Cells(rr, cc).Value
-            
-            If Err.Number <> 0 Then
-                val = "ERROR"
-                tipoVal = ""
-                Err.Clear
-            Else
-                val = CStr(valRaw)
-                tipoVal = ""
-                If IsDate(valRaw) Then tipoVal = " [FECHA]"
-                If IsNumeric(valRaw) And Not IsDate(valRaw) And valRaw <> "" Then tipoVal = " [NUM]"
-            End If
-            On Error GoTo 0
-            
-            If Len(val) > 20 Then val = Left(val, 20) & "..."
-            msj = msj & "  " & Columna(cc) & rr & " = '" & val & "'" & tipoVal & vbCrLf
+            val = CStr(ws.Cells(rr, cc).Value)
+            If Len(val) > 12 Then val = Left(val, 12)
+            msj = msj & "[" & val & "] "
         Next cc
         msj = msj & vbCrLf
     Next rr
     
-    MsgBox msj, vbInformation, "Diagnóstico Encabezados"
+    MsgBox msj, vbInformation, "Diagnóstico"
 End Sub
