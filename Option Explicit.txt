@@ -1936,3 +1936,80 @@ Sub VerFormulasFalladas()
     
     MsgBox msj, vbInformation, "Debug YTD"
 End Sub
+
+Sub DiagnosticoLocalizacionPxR()
+    Dim wsPxR As Worksheet
+    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
+    
+    Dim msj As String
+    msj = "=== HOJA: '" & wsPxR.Name & "' ===" & vbCrLf & vbCrLf
+    
+    ' Buscar "LOCAL" en columna A
+    Dim filaLocal As Long: filaLocal = 0
+    Dim ultFila As Long
+    ultFila = wsPxR.Cells(wsPxR.Rows.Count, 1).End(xlUp).Row
+    msj = msj & "Última fila con datos: " & ultFila & vbCrLf & vbCrLf
+    
+    Dim r As Long
+    For r = 1 To ultFila
+        Dim v As String
+        v = UCase(Trim(CStr(wsPxR.Cells(r, 1).Value)))
+        If v = "LOCAL" Then
+            filaLocal = r
+            Exit For
+        End If
+    Next r
+    
+    msj = msj & "Fila 'LOCAL' encontrada en: " & filaLocal & vbCrLf
+    
+    ' Buscar "Fondo 2" después de LOCAL
+    Dim filaFondo2 As Long: filaFondo2 = 0
+    For r = filaLocal + 1 To ultFila
+        If LCase(Trim(CStr(wsPxR.Cells(r, 1).Value))) = "fondo 2" Then
+            filaFondo2 = r
+            Exit For
+        End If
+    Next r
+    
+    msj = msj & "Fila 'Fondo 2' encontrada en: " & filaFondo2 & vbCrLf
+    
+    If filaFondo2 = 0 Then
+        MsgBox msj, vbCritical
+        Exit Sub
+    End If
+    
+    ' Fila encabezados = filaFondo2 + 1
+    Dim filaEnc As Long: filaEnc = filaFondo2 + 1
+    msj = msj & "Fila encabezados: " & filaEnc & vbCrLf & vbCrLf
+    
+    ' Mostrar el contenido de la fila encabezados
+    Dim ultCol As Long
+    ultCol = wsPxR.Cells(filaEnc, wsPxR.Columns.Count).End(xlToLeft).Column
+    msj = msj & "Última columna en fila encabezados: " & ultCol & " (" & Columna(ultCol) & ")" & vbCrLf & vbCrLf
+    
+    msj = msj & "Contenido fila encabezados:" & vbCrLf
+    Dim c As Long
+    For c = 1 To ultCol
+        Dim val As String
+        val = CStr(wsPxR.Cells(filaEnc, c).Value)
+        If val <> "" Then
+            msj = msj & "  " & Columna(c) & filaEnc & " = '" & val & "'" & vbCrLf
+        End If
+    Next c
+    
+    ' Buscar fila MTD
+    msj = msj & vbCrLf & "Filas siguientes (buscando MTD y tipos):" & vbCrLf
+    Dim cnt As Long: cnt = 0
+    For r = filaEnc + 1 To ultFila
+        Dim et As String
+        et = Trim(CStr(wsPxR.Cells(r, 1).Value))
+        If et <> "" Then
+            cnt = cnt + 1
+            msj = msj & "  Fila " & r & ": '" & et & "'" & vbCrLf
+            If cnt >= 15 Then Exit For
+        End If
+        If LCase(et) = "fondo 2" Or LCase(et) = "fondo 3" Then Exit For
+    Next r
+    
+    MsgBox msj, vbInformation, "Diagnóstico PxR"
+End Sub
