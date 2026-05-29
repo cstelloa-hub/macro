@@ -41,3 +41,182 @@ Sub DiagnosticoRapido()
     
     MsgBox msj, vbInformation, "Diagnóstico"
 End Sub
+
+
+
+
+
+'==================================================================
+' MACRO 5: Resumen Total (respeta B1 si ya tiene mes válido)
+'==================================================================
+Sub GenerarResumenTotal()
+    
+    Dim wb As Workbook
+    Set wb = ThisWorkbook
+    
+    Dim wsPxR As Worksheet, wsCuadroLoc As Worksheet
+    
+    On Error Resume Next
+    Set wsPxR = wb.Sheets("Pesos x Retornos")
+    Set wsCuadroLoc = wb.Sheets("Cuadro Locales")
+    On Error GoTo 0
+    
+    If wsPxR Is Nothing Then
+        MsgBox "Falta hoja 'Pesos x Retornos'. Ejecuta primero GenerarPesosXRetornos.", vbCritical
+        Exit Sub
+    End If
+    
+    Application.ScreenUpdating = False
+    
+    ' Si ya existe Resumen Total y tiene un mes válido en B1, conservarlo
+    Dim mesActual As String: mesActual = ""
+    Dim wsExist As Worksheet
+    On Error Resume Next
+    Set wsExist = wb.Sheets("Resumen Total")
+    On Error GoTo 0
+    If Not wsExist Is Nothing Then
+        mesActual = Trim(CStr(wsExist.Range("B1").Value))
+    End If
+    
+    ' Construir lista de meses disponibles
+    Dim listaMeses As String: listaMeses = ""
+    Dim ultMes As String: ultMes = "mar-26"
+    Dim mesesValidos As Object
+    Set mesesValidos = CreateObject("Scripting.Dictionary")
+    
+    If Not wsCuadroLoc Is Nothing Then
+        Dim ultColLoc As Long
+        ultColLoc = wsCuadroLoc.Cells(1, wsCuadroLoc.Columns.Count).End(xlToLeft).Column
+        Dim c As Long
+        For c = 3 To ultColLoc
+            Dim enc As String
+            enc = Trim(CStr(wsCuadroLoc.Cells(1, c).Value))
+            If enc <> "" Then
+                ultMes = enc
+                mesesValidos(LCase(enc)) = 1
+                If listaMeses = "" Then
+                    listaMeses = enc
+                Else
+                    listaMeses = listaMeses & "," & enc
+                End If
+            End If
+        Next c
+    End If
+    
+    ' Determinar mes a usar: si el actual es válido, mantenerlo; si no, usar último
+    Dim mesUsar As String
+    If mesActual <> "" And mesesValidos.exists(LCase(mesActual)) Then
+        mesUsar = mesActual
+    Else
+        mesUsar = ultMes
+    End If
+    
+    Dim wsDest As Worksheet
+    Set wsDest = ObtenerHoja(wb, "Resumen Total")
+    wsDest.Cells.Clear
+    
+    wsDest.Range("A1").Value = "Mes seleccionado:"
+    wsDest.Range("A1").Font.Bold = True
+    
+    wsDest.Range("B1").NumberFormat = "@"
+    wsDest.Range("B1").Value = mesUsar
+    wsDest.Range("B1").Font.Bold = True
+    wsDest.Range("B1").Font.Size = 12
+    wsDest.Range("B1").Interior.Color = RGB(255, 240, 180)
+    wsDest.Range("B1").Borders.LineStyle = xlContinuous
+    wsDest.Range("B1").HorizontalAlignment = xlCenter
+    
+    If listaMeses <> "" Then
+        With wsDest.Range("B1").Validation
+            .Delete
+            On Error Resume Next
+            .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Formula1:=listaMeses
+            On Error GoTo 0
+            .IgnoreBlank = True
+            .InCellDropdown = True
+        End With
+    End If
+    
+    Dim filaActual As Long: filaActual = 3
+    filaActual = ArmarBloqueResumen(wsDest, filaActual, wsPxR, "FONDO 2", "Fondo 2", mesUsar)
+    filaActual = filaActual + 2
+    filaActual = ArmarBloqueResumen(wsDest, filaActual, wsPxR, "FONDO 3", "Fondo 3", mesUsar)
+    
+    wsDest.Columns("A:D").AutoFit
+    wsDest.Activate
+    wsDest.Range("B1").Select
+    
+    Application.ScreenUpdating = True
+
+End Sub
+
+'==================================================================
+' Recalcula Resumen Total respetando el mes en B1 (sin reconstruir todo)
+'==================================================================
+Sub ActualizarResumenTotal()
+    
+    Dim wb As Workbook
+    Set wb = ThisWorkbook
+    
+    Dim wsPxR As Worksheet, wsDest As Worksheet, wsCuadroLoc As Worksheet
+    
+    On Error Resume Next
+    Set wsPxR = wb.Sheets("Pesos x Retornos")
+    Set wsDest = wb.Sheets("Resumen Total")
+    Set wsCuadroLoc = wb.Sheets("Cuadro Locales")
+    On Error GoTo 0
+    
+    If wsPxR Is Nothing Or wsDest Is Nothing Then
+        MsgBox "Faltan hojas. Ejecuta primero GenerarResumenTotal.", vbCritical
+        Exit Sub
+    End If
+    
+    ' Validar que el mes en B1 sea válido
+    Dim mesUsar As String
+    mesUsar = Trim(CStr(wsDest.Range("B1").Value))
+    
+    If mesUsar = "" Then
+        MsgBox "B1 está vacío. Selecciona un mes del menú desplegable.", vbExclamation
+        Exit Sub
+    End If
+    
+    ' Verificar que existe en Cuadro Locales
+    Dim existe As Boolean: existe = False
+    If Not wsCuadroLoc Is Nothing Then
+        Dim ultColLoc As Long
+        ultColLoc = wsCuadroLoc.Cells(1, wsCuadroLoc.Columns.Count).End(xlToLeft).Column
+        Dim c As Long
+        For c = 3 To ultColLoc
+            If LCase(Trim(CStr(wsCuadroLoc.Cells(1, c).Value))) = LCase(mesUsar) Then
+                existe = True
+                Exit For
+            End If
+        Next c
+    End If
+    
+    If Not existe Then
+        MsgBox "El mes '" & mesUsar & "' no está en Cuadro Locales. Selecciona uno del menú desplegable.", vbExclamation
+        Exit Sub
+    End If
+    
+    Application.ScreenUpdating = False
+    
+    ' Regenerar contenido manteniendo B1
+    ' Limpiar desde fila 3 hacia abajo
+    Dim ultFilaDest As Long
+    ultFilaDest = wsDest.Cells(wsDest.Rows.Count, 1).End(xlUp).Row
+    If ultFilaDest >= 3 Then
+        wsDest.Range("A3:Z" & ultFilaDest).Clear
+    End If
+    
+    Dim filaActual As Long: filaActual = 3
+    filaActual = ArmarBloqueResumen(wsDest, filaActual, wsPxR, "FONDO 2", "Fondo 2", mesUsar)
+    filaActual = filaActual + 2
+    filaActual = ArmarBloqueResumen(wsDest, filaActual, wsPxR, "FONDO 3", "Fondo 3", mesUsar)
+    
+    wsDest.Columns("A:D").AutoFit
+    
+    Application.ScreenUpdating = True
+    
+    MsgBox "Resumen Total actualizado para el mes: " & mesUsar, vbInformation
+End Sub
