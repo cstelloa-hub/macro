@@ -1321,8 +1321,19 @@ Private Function EscribirTiposBloque(wsDest As Worksheet, filaInicio As Long, _
     Dim subpartes() As String
     subpartes = Split(partes(3), ";")
     
-    Dim nombreHojaPxR As String
-    nombreHojaPxR = "'" & wsPxR.Name & "'"
+    ' Leer mes seleccionado de B1
+    Dim mesSeleccionado As String
+    mesSeleccionado = Trim(CStr(wsDest.Range("B1").Value))
+    
+    ' Buscar la columna del mes seleccionado en los encabezados de PxR
+    Dim colMesSel As Long: colMesSel = 0
+    Dim c As Long
+    For c = colDic25 To colUltMes
+        If LCase(Trim(CStr(wsPxR.Cells(filaEnc, c).Value))) = LCase(mesSeleccionado) Then
+            colMesSel = c
+            Exit For
+        End If
+    Next c
     
     Dim primerMesCol As Long: primerMesCol = colDic25 + 1
     
@@ -1338,44 +1349,31 @@ Private Function EscribirTiposBloque(wsDest As Worksheet, filaInicio As Long, _
                 
                 wsDest.Cells(fila, 1).Value = "  " & tipo
                 
-                ' Rangos como cadenas
-                Dim rangoEncab As String
-                rangoEncab = nombreHojaPxR & "!" & Columna(colDic25) & filaEnc & ":" & _
-                             Columna(colUltMes) & filaEnc
-                
-                Dim rangoSubtotalCompleto As String
-                rangoSubtotalCompleto = nombreHojaPxR & "!" & Columna(colDic25) & filaTipoPxR & ":" & _
-                                        Columna(colUltMes) & filaTipoPxR
-                
-                Dim primeraCeldaMeses As String
-                primeraCeldaMeses = nombreHojaPxR & "!" & Columna(primerMesCol) & filaTipoPxR
-                
-                ' MTD
-                Dim formMtd As String
-                formMtd = "=IFERROR(INDEX(" & rangoSubtotalCompleto & ",1," & _
-                          "MATCH($B$1," & rangoEncab & ",0)),0)"
-                
-                ' YTD (más simple, sin IF anidado)
-                Dim formYtd As String
-                formYtd = "=IFERROR(PRODUCT(1+OFFSET(" & primeraCeldaMeses & _
-                          ",0,0,1,MATCH($B$1," & rangoEncab & ",0)-1))-1,0)"
-                
-                On Error Resume Next
-                wsDest.Cells(fila, 2).Formula = formMtd
-                If Err.Number <> 0 Then
-                    wsDest.Cells(fila, 2).Value = "ERR MTD"
-                    Err.Clear
+                ' MTD: valor del mes seleccionado
+                Dim mtd As Double: mtd = 0
+                If colMesSel > 0 Then
+                    Dim vMtd As Variant
+                    vMtd = wsPxR.Cells(filaTipoPxR, colMesSel).Value
+                    If IsNumeric(vMtd) Then mtd = CDbl(vMtd)
                 End If
-                On Error GoTo 0
+                wsDest.Cells(fila, 2).Value = mtd
                 wsDest.Cells(fila, 2).NumberFormat = "0.00%"
                 
-                On Error Resume Next
-                wsDest.Cells(fila, 3).Formula = formYtd
-                If Err.Number <> 0 Then
-                    wsDest.Cells(fila, 3).Value = "ERR YTD"
-                    Err.Clear
+                ' YTD: producto compuesto desde primerMesCol hasta colMesSel
+                Dim ytd As Double: ytd = 0
+                If colMesSel > 0 And colMesSel >= primerMesCol Then
+                    Dim acumulado As Double: acumulado = 1
+                    Dim cc As Long
+                    For cc = primerMesCol To colMesSel
+                        Dim vRet As Variant
+                        vRet = wsPxR.Cells(filaTipoPxR, cc).Value
+                        If IsNumeric(vRet) Then
+                            acumulado = acumulado * (1 + CDbl(vRet))
+                        End If
+                    Next cc
+                    ytd = acumulado - 1
                 End If
-                On Error GoTo 0
+                wsDest.Cells(fila, 3).Value = ytd
                 wsDest.Cells(fila, 3).NumberFormat = "0.00%"
                 
                 fila = fila + 1
