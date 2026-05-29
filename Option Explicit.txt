@@ -2013,3 +2013,25 @@ Sub DiagnosticoLocalizacionPxR()
     
     MsgBox msj, vbInformation, "Diagnóstico PxR"
 End Sub
+
+Sub DiagnosticoPxR2()
+    Dim wsPxR As Worksheet
+    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
+    
+    Dim msj As String
+    msj = "Lectura BRUTA de las primeras filas de Pesos x Retornos:" & vbCrLf & vbCrLf
+    
+    Dim r As Long, c As Long
+    For r = 1 To 6
+        msj = msj & "Fila " & r & ": "
+        For c = 1 To 12
+            Dim val As String
+            val = CStr(wsPxR.Cells(r, c).Value)
+            If Len(val) > 15 Then val = Left(val, 15)
+            msj = msj & "[" & Columna(c) & ":" & val & "] "
+        Next c
+        msj = msj & vbCrLf
+    Next r
+    
+    MsgBox msj, vbInformation, "Lectura PxR"
+End Sub
