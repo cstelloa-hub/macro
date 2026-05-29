@@ -1338,32 +1338,44 @@ Private Function EscribirTiposBloque(wsDest As Worksheet, filaInicio As Long, _
                 
                 wsDest.Cells(fila, 1).Value = "  " & tipo
                 
-                ' MTD: INDEX/MATCH del mes seleccionado
-                Dim formMtd As String
-                formMtd = "=IFERROR(INDEX(" & nombreHojaPxR & "!" & _
-                          Columna(colDic25) & filaTipoPxR & ":" & Columna(colUltMes) & filaTipoPxR & "," & _
-                          "1,MATCH($B$1," & nombreHojaPxR & "!" & _
-                          Columna(colDic25) & filaEnc & ":" & Columna(colUltMes) & filaEnc & ",0)),0)"
-                wsDest.Cells(fila, 2).Formula = formMtd
-                wsDest.Cells(fila, 2).NumberFormat = "0.00%"
-                
-                ' YTD: PRODUCT(1+OFFSET(...)) - 1
-                ' Empezamos en Ene-26 y tomamos N meses donde N = posición del mes seleccionado en lista de meses (sin Dic-25)
-                ' MATCH busca posición desde Dic-25, así que mar-26 = posición 4 (Dic, Ene, Feb, Mar)
-                ' Pero queremos contar desde Ene-26, así que N = MATCH - 1
-                ' Si seleccionas Dic-25 (mes 1), N = 0 → no debería compoundear nada
-                
+                ' Rangos como cadenas
                 Dim rangoEncab As String
                 rangoEncab = nombreHojaPxR & "!" & Columna(colDic25) & filaEnc & ":" & _
                              Columna(colUltMes) & filaEnc
                 
-                Dim formYtd As String
-                formYtd = "=IFERROR(IF(MATCH($B$1," & rangoEncab & ",0)<=1,0," & _
-                          "PRODUCT(1+OFFSET(" & nombreHojaPxR & "!" & _
-                          Columna(primerMesCol) & filaTipoPxR & ",0,0,1," & _
-                          "MATCH($B$1," & rangoEncab & ",0)-1))-1),0)"
+                Dim rangoSubtotalCompleto As String
+                rangoSubtotalCompleto = nombreHojaPxR & "!" & Columna(colDic25) & filaTipoPxR & ":" & _
+                                        Columna(colUltMes) & filaTipoPxR
                 
+                Dim primeraCeldaMeses As String
+                primeraCeldaMeses = nombreHojaPxR & "!" & Columna(primerMesCol) & filaTipoPxR
+                
+                ' MTD
+                Dim formMtd As String
+                formMtd = "=IFERROR(INDEX(" & rangoSubtotalCompleto & ",1," & _
+                          "MATCH($B$1," & rangoEncab & ",0)),0)"
+                
+                ' YTD (más simple, sin IF anidado)
+                Dim formYtd As String
+                formYtd = "=IFERROR(PRODUCT(1+OFFSET(" & primeraCeldaMeses & _
+                          ",0,0,1,MATCH($B$1," & rangoEncab & ",0)-1))-1,0)"
+                
+                On Error Resume Next
+                wsDest.Cells(fila, 2).Formula = formMtd
+                If Err.Number <> 0 Then
+                    wsDest.Cells(fila, 2).Value = "ERR MTD"
+                    Err.Clear
+                End If
+                On Error GoTo 0
+                wsDest.Cells(fila, 2).NumberFormat = "0.00%"
+                
+                On Error Resume Next
                 wsDest.Cells(fila, 3).Formula = formYtd
+                If Err.Number <> 0 Then
+                    wsDest.Cells(fila, 3).Value = "ERR YTD"
+                    Err.Clear
+                End If
+                On Error GoTo 0
                 wsDest.Cells(fila, 3).NumberFormat = "0.00%"
                 
                 fila = fila + 1
