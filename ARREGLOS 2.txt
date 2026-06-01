@@ -713,3 +713,104 @@ Sub DiagnosticoExtranjeroFinal()
     
     MsgBox msj, vbInformation, "Diagnóstico"
 End Sub
+
+
+
+Private Function LocalizarSeccionPxR(wsPxR As Worksheet, _
+                                      origenBuscar As String, _
+                                      fondoBuscar As String) As String
+    
+    Dim ultFila As Long
+    ultFila = wsPxR.Cells(wsPxR.Rows.Count, 1).End(xlUp).Row
+    
+    ' Buscar la sección de origen (LOCAL o EXTRANJERO)
+    Dim filaOrigen As Long: filaOrigen = 0
+    Dim r As Long
+    For r = 1 To ultFila
+        If UCase(Trim(CStr(wsPxR.Cells(r, 1).Value))) = UCase(origenBuscar) Then
+            filaOrigen = r
+            Exit For
+        End If
+    Next r
+    
+    If filaOrigen = 0 Then
+        LocalizarSeccionPxR = ""
+        Exit Function
+    End If
+    
+    ' Buscar fin de la sección (siguiente LOCAL/EXTRANJERO)
+    Dim filaFinSeccion As Long: filaFinSeccion = ultFila
+    For r = filaOrigen + 1 To ultFila
+        Dim val As String: val = UCase(Trim(CStr(wsPxR.Cells(r, 1).Value)))
+        If val = "LOCAL" Or val = "EXTRANJERO" Then
+            filaFinSeccion = r - 1
+            Exit For
+        End If
+    Next r
+    
+    ' Buscar fondo dentro de la sección
+    Dim filaFondo As Long: filaFondo = 0
+    For r = filaOrigen + 1 To filaFinSeccion
+        If LCase(Trim(CStr(wsPxR.Cells(r, 1).Value))) = LCase(fondoBuscar) Then
+            filaFondo = r
+            Exit For
+        End If
+    Next r
+    
+    If filaFondo = 0 Then
+        LocalizarSeccionPxR = ""
+        Exit Function
+    End If
+    
+    ' Buscar el SIGUIENTE fondo dentro de la sección (para limitar el bloque actual)
+    Dim filaFinBloque As Long: filaFinBloque = filaFinSeccion
+    For r = filaFondo + 1 To filaFinSeccion
+        Dim etqF As String: etqF = LCase(Trim(CStr(wsPxR.Cells(r, 1).Value)))
+        If etqF = "fondo 2" Or etqF = "fondo 3" Then
+            filaFinBloque = r - 1
+            Exit For
+        End If
+    Next r
+    
+    Dim filaEnc As Long: filaEnc = filaFondo + 1
+    
+    Dim ultCol As Long
+    ultCol = wsPxR.Cells(filaEnc, wsPxR.Columns.Count).End(xlToLeft).Column
+    If ultCol < 5 Then ultCol = 10
+    If ultCol > 50 Then ultCol = 50
+    
+    Dim colDic25 As Long: colDic25 = 0
+    Dim c As Long
+    For c = 5 To ultCol
+        Dim h As String: h = LCase(Trim(CStr(wsPxR.Cells(filaEnc, c).Value)))
+        If h = "dic-25" Or h = "dic25" Then colDic25 = c
+    Next c
+    
+    If colDic25 = 0 Then colDic25 = 5
+    
+    ' Buscar MTD SOLO dentro del bloque (entre filaEnc y filaFinBloque)
+    Dim filaMTD As Long: filaMTD = 0
+    For r = filaEnc + 1 To filaFinBloque
+        If UCase(Trim(CStr(wsPxR.Cells(r, 1).Value))) = "MTD" Then
+            filaMTD = r
+            Exit For
+        End If
+    Next r
+    
+    If filaMTD = 0 Then
+        LocalizarSeccionPxR = ""
+        Exit Function
+    End If
+    
+    ' Recolectar tipos SOLO dentro del bloque (después de MTD hasta filaFinBloque)
+    Dim tiposInfo As String: tiposInfo = ""
+    For r = filaMTD + 1 To filaFinBloque
+        Dim etiqueta As String: etiqueta = Trim(CStr(wsPxR.Cells(r, 1).Value))
+        If etiqueta = "" Then Exit For
+        If LCase(etiqueta) = "fondo 2" Or LCase(etiqueta) = "fondo 3" Then Exit For
+        If UCase(etiqueta) = "LOCAL" Or UCase(etiqueta) = "EXTRANJERO" Then Exit For
+        tiposInfo = tiposInfo & ";" & etiqueta & ":" & r
+    Next r
+    
+    LocalizarSeccionPxR = filaEnc & "|" & colDic25 & "|" & ultCol & "|" & filaMTD & tiposInfo
+End Function
