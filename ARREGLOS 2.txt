@@ -630,3 +630,18 @@ Private Function TrimestreComparable(tr As String) As Double
 End Function
 
 
+
+
+Sub ProbarMesATrimestre()
+    Dim msj As String
+    msj = "Pruebas de MesATrimestre:" & vbCrLf & vbCrLf
+    
+    msj = msj & "'ene-26' -> '" & MesATrimestre("ene-26") & "'" & vbCrLf
+    msj = msj & "'feb-26' -> '" & MesATrimestre("feb-26") & "'" & vbCrLf
+    msj = msj & "'mar-26' -> '" & MesATrimestre("mar-26") & "'" & vbCrLf
+    msj = msj & "'abr-26' -> '" & MesATrimestre("abr-26") & "'" & vbCrLf
+    msj = msj & "'may-26' -> '" & MesATrimestre("may-26") & "'" & vbCrLf
+    
+    MsgBox msj, vbInformation, "Prueba"
+End Sub
+
