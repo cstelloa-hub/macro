@@ -645,3 +645,71 @@ Sub ProbarMesATrimestre()
     MsgBox msj, vbInformation, "Prueba"
 End Sub
 
+
+
+
+
+Sub DiagnosticoExtranjeroFinal()
+    Dim wsPxR As Worksheet
+    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
+    
+    Dim wsResumen As Worksheet
+    Set wsResumen = ThisWorkbook.Sheets("Resumen Total")
+    
+    Dim mesSel As String
+    mesSel = CStr(wsResumen.Range("B1").Value)
+    
+    Dim msj As String
+    msj = "Mes seleccionado en B1: '" & mesSel & "'" & vbCrLf
+    msj = msj & "Trimestre equivalente: '" & MesATrimestre(mesSel) & "'" & vbCrLf & vbCrLf
+    
+    ' Localizar sección EXTRANJERO / Fondo 2
+    Dim info As String
+    info = LocalizarSeccionPxR(wsPxR, "EXTRANJERO", "Fondo 2")
+    
+    If info = "" Then
+        msj = msj & "NO se encontró sección EXTRANJERO/Fondo 2"
+        MsgBox msj, vbCritical
+        Exit Sub
+    End If
+    
+    Dim partes() As String
+    partes = Split(info, "|")
+    Dim filaEnc As Long: filaEnc = CLng(partes(0))
+    Dim colDic25 As Long: colDic25 = CLng(partes(1))
+    Dim colUltMes As Long: colUltMes = CLng(partes(2))
+    
+    msj = msj & "Fila encabezados PxR Ext F2: " & filaEnc & vbCrLf
+    msj = msj & "Col Dic-25: " & Columna(colDic25) & vbCrLf
+    msj = msj & "Col Ult: " & Columna(colUltMes) & vbCrLf & vbCrLf
+    
+    msj = msj & "Encabezados en esa fila:" & vbCrLf
+    Dim c As Long
+    For c = colDic25 To colUltMes
+        Dim val As String
+        val = CStr(wsPxR.Cells(filaEnc, c).Value)
+        msj = msj & "  Col " & Columna(c) & " = '" & val & "'" & vbCrLf
+    Next c
+    
+    msj = msj & vbCrLf & "Trimestre buscado: '" & MesATrimestre(mesSel) & "'" & vbCrLf
+    
+    ' Intentar match exacto
+    Dim trObjetivo As String: trObjetivo = MesATrimestre(mesSel)
+    Dim colEncontrada As Long: colEncontrada = 0
+    For c = colDic25 + 1 To colUltMes
+        Dim hEnc As String: hEnc = LCase(Trim(CStr(wsPxR.Cells(filaEnc, c).Value)))
+        If hEnc = LCase(trObjetivo) Then
+            colEncontrada = c
+            Exit For
+        End If
+    Next c
+    
+    msj = msj & "Match exacto: "
+    If colEncontrada > 0 Then
+        msj = msj & "encontrado en col " & Columna(colEncontrada)
+    Else
+        msj = msj & "NO encontrado"
+    End If
+    
+    MsgBox msj, vbInformation, "Diagnóstico Final"
+End Sub
