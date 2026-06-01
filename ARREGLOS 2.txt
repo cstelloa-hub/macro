@@ -461,4 +461,172 @@ End Function
 
 
 
+Private Function EscribirTiposBloque(wsDest As Worksheet, filaInicio As Long, _
+                                      wsPxR As Worksheet, info As String, _
+                                      mesSel As String) As Long
+    Dim fila As Long: fila = filaInicio
+    
+    Dim partes() As String
+    partes = Split(info, "|")
+    Dim filaEnc As Long: filaEnc = CLng(partes(0))
+    Dim colDic25 As Long: colDic25 = CLng(partes(1))
+    Dim colUltMes As Long: colUltMes = CLng(partes(2))
+    
+    Dim subpartes() As String
+    subpartes = Split(partes(3), ";")
+    
+    ' Detectar si la sección es trimestral o mensual mirando el primer encabezado después de Dic-25
+    Dim esTrimestral As Boolean: esTrimestral = False
+    If colUltMes > colDic25 Then
+        Dim primerEncab As String
+        primerEncab = LCase(Trim(CStr(wsPxR.Cells(filaEnc, colDic25 + 1).Value)))
+        If InStr(primerEncab, "q") = 1 Then esTrimestral = True
+    End If
+    
+    ' Buscar la columna del mes/trimestre seleccionado
+    Dim colMesSel As Long: colMesSel = 0
+    Dim c As Long
+    
+    If esTrimestral Then
+        ' Convertir mes seleccionado a su trimestre correspondiente
+        Dim trimestreObjetivo As String
+        trimestreObjetivo = MesATrimestre(mesSel)
+        
+        ' Buscar exacto
+        For c = colDic25 + 1 To colUltMes
+            If LCase(Trim(CStr(wsPxR.Cells(filaEnc, c).Value))) = LCase(trimestreObjetivo) Then
+                colMesSel = c
+                Exit For
+            End If
+        Next c
+        
+        ' Si no existe, usar el último trimestre <= objetivo
+        If colMesSel = 0 Then
+            Dim mejorCol As Long: mejorCol = 0
+            For c = colDic25 + 1 To colUltMes
+                Dim trEncab As String
+                trEncab = Trim(CStr(wsPxR.Cells(filaEnc, c).Value))
+                If trEncab <> "" Then
+                    If TrimestreComparable(trEncab) <= TrimestreComparable(trimestreObjetivo) Then
+                        mejorCol = c
+                    End If
+                End If
+            Next c
+            colMesSel = mejorCol
+        End If
+    Else
+        ' Mensual: buscar directo
+        For c = colDic25 To colUltMes
+            If LCase(Trim(CStr(wsPxR.Cells(filaEnc, c).Value))) = LCase(mesSel) Then
+                colMesSel = c
+                Exit For
+            End If
+        Next c
+    End If
+    
+    Dim primerMesCol As Long: primerMesCol = colDic25 + 1
+    
+    Dim i As Long
+    For i = 1 To UBound(subpartes)
+        Dim subItem As String: subItem = subpartes(i)
+        If subItem <> "" Then
+            Dim sp() As String
+            sp = Split(subItem, ":")
+            If UBound(sp) >= 1 Then
+                Dim tipo As String: tipo = sp(0)
+                Dim filaTipoPxR As Long: filaTipoPxR = CLng(sp(1))
+                
+                wsDest.Cells(fila, 1).Value = "  " & tipo
+                
+                ' MTD: valor del mes/trimestre seleccionado
+                Dim mtd As Double: mtd = 0
+                If colMesSel > 0 Then
+                    Dim vMtd As Variant
+                    vMtd = wsPxR.Cells(filaTipoPxR, colMesSel).Value
+                    If IsNumeric(vMtd) Then mtd = CDbl(vMtd)
+                End If
+                wsDest.Cells(fila, 2).Value = mtd
+                wsDest.Cells(fila, 2).NumberFormat = "0.00%"
+                
+                ' YTD: producto compuesto desde primer mes/trimestre hasta el seleccionado
+                Dim ytd As Double: ytd = 0
+                If colMesSel > 0 And colMesSel >= primerMesCol Then
+                    Dim acumulado As Double: acumulado = 1
+                    Dim cc As Long
+                    For cc = primerMesCol To colMesSel
+                        Dim vRet As Variant
+                        vRet = wsPxR.Cells(filaTipoPxR, cc).Value
+                        If IsNumeric(vRet) Then
+                            acumulado = acumulado * (1 + CDbl(vRet))
+                        End If
+                    Next cc
+                    ytd = acumulado - 1
+                End If
+                wsDest.Cells(fila, 3).Value = ytd
+                wsDest.Cells(fila, 3).NumberFormat = "0.00%"
+                
+                fila = fila + 1
+            End If
+        End If
+    Next i
+    
+    EscribirTiposBloque = fila
+End Function
+
+'==================================================================
+' Convierte un mes tipo "abr-26" al trimestre "Q2-2026"
+'==================================================================
+Private Function MesATrimestre(mesTxt As String) As String
+    On Error Resume Next
+    Dim fch As Date
+    fch = DateValue("1-" & mesTxt)
+    
+    If Err.Number <> 0 Then
+        Err.Clear
+        MesATrimestre = ""
+        Exit Function
+    End If
+    On Error GoTo 0
+    
+    Dim mes As Integer, anio As Integer
+    mes = Month(fch)
+    anio = Year(fch)
+    
+    Dim trimestre As Integer
+    trimestre = ((mes - 1) \ 3) + 1
+    
+    MesATrimestre = "Q" & trimestre & "-" & anio
+End Function
+
+'==================================================================
+' Convierte "Q1-2026" a número comparable (2026.1, 2026.2, etc.)
+'==================================================================
+Private Function TrimestreComparable(tr As String) As Double
+    On Error Resume Next
+    Dim partes() As String
+    partes = Split(tr, "-")
+    If UBound(partes) < 1 Then
+        TrimestreComparable = 0
+        Exit Function
+    End If
+    
+    Dim qStr As String, anioStr As String
+    qStr = partes(0)
+    anioStr = partes(1)
+    
+    Dim qNum As Integer
+    qNum = CInt(Replace(LCase(qStr), "q", ""))
+    
+    Dim anioNum As Integer
+    anioNum = CInt(anioStr)
+    
+    TrimestreComparable = anioNum + (qNum / 10)
+    
+    If Err.Number <> 0 Then
+        Err.Clear
+        TrimestreComparable = 0
+    End If
+    On Error GoTo 0
+End Function
+
 
