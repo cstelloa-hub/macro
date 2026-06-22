@@ -1,108 +1,149 @@
-Sub DiagnosticoSimple()
-    Dim codFondo As String
-    codFondo = InputBox("Código SBS del fondo:", "Diagnóstico")
-    If codFondo = "" Then Exit Sub
-    codFondo = Trim(codFondo)
+Private Sub VolcarData(wsMarcas As Worksheet, wsData As Worksheet)
     
-    Dim wsCuadroLoc As Worksheet, wsCuadroExt As Worksheet, wsPesos As Worksheet, wsPxR As Worksheet
-    Set wsCuadroLoc = ThisWorkbook.Sheets("Cuadro Locales")
-    Set wsCuadroExt = ThisWorkbook.Sheets("Cuadro Extranjeros")
-    Set wsPesos = ThisWorkbook.Sheets("Pesos")
-    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
+    wsData.Cells.Clear
     
-    Dim msj As String
-    msj = "DIAGNÓSTICO PARA: " & codFondo & vbCrLf & vbCrLf
+    ' 5 COLUMNAS (con EEFF)
+    wsData.Range("A1").Value = "Código SBS"
+    wsData.Range("B1").Value = "Nombre Fondo"
+    wsData.Range("C1").Value = "Día"
+    wsData.Range("D1").Value = "EEFF"
+    wsData.Range("E1").Value = "Var.Adj."
+    wsData.Range("A1:E1").Font.Bold = True
+    wsData.Range("A1:E1").Interior.Color = RGB(200, 215, 235)
     
-    ' 1. PESO DIC-25 leído por la macro
-    Dim pesosF2 As Object: Set pesosF2 = LeerPesosDic25(wsPesos, "FONDO 2")
-    Dim pesosF3 As Object: Set pesosF3 = LeerPesosDic25(wsPesos, "FONDO 3")
+    Dim ultCol As Long, ultFila As Long
+    ultCol = wsMarcas.Cells(3, wsMarcas.Columns.Count).End(xlToLeft).Column
+    If ultCol < 1 Then Exit Sub
+    If ultCol > 2000 Then ultCol = 2000
     
-    msj = msj & "PESO DIC-25 leído:" & vbCrLf
-    If pesosF2.exists(codFondo) Then
-        msj = msj & "  F2: " & Format(CDbl(pesosF2(codFondo)), "0.0000%") & vbCrLf
-    End If
-    If pesosF3.exists(codFondo) Then
-        msj = msj & "  F3: " & Format(CDbl(pesosF3(codFondo)), "0.0000%") & vbCrLf
-    End If
-    If Not pesosF2.exists(codFondo) And Not pesosF3.exists(codFondo) Then
-        msj = msj & "  ⚠ NO ENCONTRADO en F2 ni F3" & vbCrLf
-    End If
+    ultFila = wsMarcas.UsedRange.Rows.Count
+    If ultFila > 1000 Then ultFila = 1000
+    If ultFila < 5 Then ultFila = 5
     
-    ' 2. RETORNOS por mes
-    Dim wsCuadroUsar As Worksheet
-    Dim filaC As Long: filaC = 0
-    Dim r As Long
+    Dim arrMarcas As Variant
+    arrMarcas = wsMarcas.Range(wsMarcas.Cells(1, 1), wsMarcas.Cells(ultFila, ultCol)).Value
     
-    ' Buscar en Locales
-    Dim ultL As Long: ultL = wsCuadroLoc.Cells(wsCuadroLoc.Rows.Count, 2).End(xlUp).Row
-    For r = 2 To ultL
-        If Trim(CStr(wsCuadroLoc.Cells(r, 2).Value)) = codFondo Then
-            filaC = r
-            Set wsCuadroUsar = wsCuadroLoc
-            Exit For
+    Dim colsInicio As Collection
+    Set colsInicio = New Collection
+    
+    Dim j As Long
+    For j = 1 To ultCol
+        Dim h As String
+        h = LCase(Trim(CStr(arrMarcas(3, j))))
+        If h = "día" Or h = "dia" Then colsInicio.Add j
+    Next j
+    
+    If colsInicio.Count = 0 Then Exit Sub
+    
+    Dim arrSalida() As Variant
+    ReDim arrSalida(1 To 100000, 1 To 5)
+    Dim filaSal As Long: filaSal = 0
+    
+    Dim b As Long
+    For b = 1 To colsInicio.Count
+        Dim colIni As Long, colFin As Long
+        colIni = colsInicio(b)
+        If b < colsInicio.Count Then
+            colFin = colsInicio(b + 1) - 1
+        Else
+            colFin = ultCol
         End If
-    Next r
-    
-    ' Buscar en Extranjeros
-    If filaC = 0 Then
-        Dim ultE As Long: ultE = wsCuadroExt.Cells(wsCuadroExt.Rows.Count, 2).End(xlUp).Row
-        For r = 2 To ultE
-            If Trim(CStr(wsCuadroExt.Cells(r, 2).Value)) = codFondo Then
-                filaC = r
-                Set wsCuadroUsar = wsCuadroExt
-                Exit For
-            End If
-        Next r
-    End If
-    
-    msj = msj & vbCrLf & "RETORNOS POR MES en " & wsCuadroUsar.Name & ":" & vbCrLf
-    If filaC > 0 Then
-        Dim ultC As Long: ultC = wsCuadroUsar.Cells(1, wsCuadroUsar.Columns.Count).End(xlToLeft).Column
-        Dim c As Long
-        For c = 3 To ultC
-            Dim enc As String: enc = CStr(wsCuadroUsar.Cells(1, c).Value)
-            Dim v As Variant: v = wsCuadroUsar.Cells(filaC, c).Value
-            msj = msj & "  " & enc & " = "
-            If IsNumeric(v) And v <> "" Then
-                msj = msj & Format(CDbl(v), "0.0000%")
-            Else
-                msj = msj & "vacío"
-            End If
-            msj = msj & vbCrLf
-        Next c
-    Else
-        msj = msj & "  NO ESTÁ en Cuadro" & vbCrLf
-    End If
-    
-    ' 3. VALOR EN PxR
-    msj = msj & vbCrLf & "EN PESOS x RETORNOS (lo que sale):" & vbCrLf
-    Dim ultP As Long: ultP = wsPxR.Cells(wsPxR.Rows.Count, 2).End(xlUp).Row
-    Dim filaP As Long: filaP = 0
-    For r = 1 To ultP
-        If Trim(CStr(wsPxR.Cells(r, 2).Value)) = codFondo Then
-            filaP = r
-            Exit For
-        End If
-    Next r
-    
-    If filaP > 0 Then
-        Dim filaEnc As Long: filaEnc = 0
-        For r = filaP - 1 To 1 Step -1
-            If LCase(Trim(CStr(wsPxR.Cells(r, 5).Value))) = "dic-25" Then
-                filaEnc = r
-                Exit For
-            End If
-        Next r
         
-        If filaEnc > 0 Then
-            Dim ultCp As Long: ultCp = wsPxR.Cells(filaEnc, wsPxR.Columns.Count).End(xlToLeft).Column
-            For c = 5 To ultCp
-                Dim enc3 As String: enc3 = CStr(wsPxR.Cells(filaEnc, c).Value)
-                Dim v3 As Variant: v3 = wsPxR.Cells(filaP, c).Value
-                msj = msj & "  " & enc3 & " = " & Format(CDbl(v3), "0.0000%") & vbCrLf
-            Next c
-        End If
+        Dim nombre As String, codigo As String
+        nombre = Trim(CStr(arrMarcas(1, colIni)))
+        codigo = Trim(CStr(arrMarcas(2, colIni)))
+        
+        Dim colVar As Long: colVar = 0
+        Dim colEEFF As Long: colEEFF = 0
+        For j = colIni To colFin
+            Dim hh As String
+            hh = LCase(Replace(Trim(CStr(arrMarcas(3, j))), " ", ""))
+            Select Case hh
+                Case "var.adj.", "var.adj", "varadj", "varadj.", "variaciónajustada", "variacionajustada"
+                    colVar = j
+                Case "eeff", "ee.ff.", "ee.ff", "ef.fi.", "eff", "estadosfinancieros"
+                    colEEFF = j
+            End Select
+        Next j
+        
+        If codigo = "" Or colVar = 0 Then GoTo SiguienteBloque
+        
+        Dim rr As Long, vaciosSeguidos As Long
+        vaciosSeguidos = 0
+        rr = 4
+        Do
+            If rr > ultFila Then Exit Do
+            
+            Dim vFch As Variant
+            vFch = arrMarcas(rr, colIni)
+            
+            If IsDate(vFch) Then
+                vaciosSeguidos = 0
+                Dim vVar As Variant
+                vVar = arrMarcas(rr, colVar)
+                
+                ' Limpiar el valor: si es texto con %, sacarle el % y dividir entre 100
+                Dim vVarStr As String
+                vVarStr = CStr(vVar)
+                Dim teniaPorcentaje As Boolean
+                teniaPorcentaje = (InStr(vVarStr, "%") > 0)
+                vVarStr = Replace(vVarStr, "%", "")
+                vVarStr = Replace(vVarStr, ",", ".")
+                vVarStr = Trim(vVarStr)
+                
+                If IsNumeric(vVarStr) Then
+                    Dim varNumLimpio As Double
+                    varNumLimpio = CDbl(vVarStr)
+                    
+                    ' Si tenía %, dividir entre 100 para convertir a decimal
+                    If teniaPorcentaje Then
+                        varNumLimpio = varNumLimpio / 100
+                    End If
+                    
+                    filaSal = filaSal + 1
+                    arrSalida(filaSal, 1) = codigo
+                    arrSalida(filaSal, 2) = nombre
+                    arrSalida(filaSal, 3) = CDate(vFch)
+                    
+                    If colEEFF > 0 Then
+                        arrSalida(filaSal, 4) = arrMarcas(rr, colEEFF)
+                    Else
+                        arrSalida(filaSal, 4) = ""
+                    End If
+                    
+                    arrSalida(filaSal, 5) = varNumLimpio
+                End If
+            Else
+                Dim txt As String
+                txt = LCase(Trim(CStr(vFch)))
+                If txt = "f1" Or txt = "cc" Or txt = "dd" Or txt = "nav" Or txt = "%" Then Exit Do
+                If txt = "" Then
+                    vaciosSeguidos = vaciosSeguidos + 1
+                    If vaciosSeguidos > 30 Then Exit Do
+                Else
+                    Exit Do
+                End If
+            End If
+            rr = rr + 1
+        Loop
+        
+SiguienteBloque:
+    Next b
+    
+    If filaSal > 0 Then
+        Dim arrFinal() As Variant
+        ReDim arrFinal(1 To filaSal, 1 To 5)
+        Dim i As Long, kk As Long
+        For i = 1 To filaSal
+            For kk = 1 To 5
+                arrFinal(i, kk) = arrSalida(i, kk)
+            Next kk
+        Next i
+        
+        wsData.Range("A2").Resize(filaSal, 5).Value = arrFinal
+        wsData.Range("C2:C" & filaSal + 1).NumberFormat = "dd/mm/yyyy"
+        wsData.Range("E2:E" & filaSal + 1).NumberFormat = "0.00%"
     End If
     
-    MsgBox msj, vbInformation, "Diagnóstico"
+    wsData.Columns("A:E").AutoFit
 End Sub
