@@ -1,0 +1,35 @@
+Sub VerificarVersion()
+    Dim msj As String
+    msj = "VERIFICACIÓN DE VERSIÓN" & vbCrLf & vbCrLf
+    
+    ' Verificar si existe LeerPesosPorMes
+    Dim tieneLeerPesosPorMes As Boolean: tieneLeerPesosPorMes = False
+    Dim tieneTrimestreAMesUltimo As Boolean: tieneTrimestreAMesUltimo = False
+    
+    On Error Resume Next
+    Dim ws As Worksheet: Set ws = ThisWorkbook.Sheets("Pesos")
+    Dim resultado As Object
+    Set resultado = Application.Run("LeerPesosPorMes", ws, "FONDO 2")
+    If Not resultado Is Nothing Then tieneLeerPesosPorMes = True
+    Err.Clear
+    
+    Dim test As String
+    test = Application.Run("TrimestreAMesUltimo", "q1-2026")
+    If test <> "" Then tieneTrimestreAMesUltimo = True
+    Err.Clear
+    On Error GoTo 0
+    
+    If tieneLeerPesosPorMes Then
+        msj = msj & "✓ Funcion LeerPesosPorMes EXISTE (versión nueva)" & vbCrLf
+    Else
+        msj = msj & "✗ Funcion LeerPesosPorMes NO existe (tienes versión vieja)" & vbCrLf
+    End If
+    
+    If tieneTrimestreAMesUltimo Then
+        msj = msj & "✓ Funcion TrimestreAMesUltimo EXISTE" & vbCrLf
+    Else
+        msj = msj & "✗ Funcion TrimestreAMesUltimo NO existe" & vbCrLf
+    End If
+    
+    MsgBox msj, vbInformation
+End Sub
