@@ -245,3 +245,127 @@ Sub VerTipoCeldaMarcas()
     
     MsgBox msj, vbInformation
 End Sub
+
+
+
+
+OTROOO
+
+Sub VerificarCalculoJunio()
+    Dim codBuscar As String
+    codBuscar = "5111102FIBR3"
+    
+    Dim wsCuadroLoc As Worksheet, wsPesos As Worksheet, wsPxR As Worksheet
+    Set wsCuadroLoc = ThisWorkbook.Sheets("Cuadro Locales")
+    Set wsPesos = ThisWorkbook.Sheets("Pesos")
+    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
+    
+    Dim msj As String
+    msj = "VERIFICACIÓN PARA " & codBuscar & " - JUN-26" & vbCrLf & vbCrLf
+    
+    ' 1. Retorno crudo (Value) en Cuadro Locales
+    Dim filaC As Long: filaC = 0
+    Dim ultF As Long: ultF = wsCuadroLoc.Cells(wsCuadroLoc.Rows.Count, 2).End(xlUp).Row
+    Dim r As Long
+    For r = 2 To ultF
+        If Trim(CStr(wsCuadroLoc.Cells(r, 2).Value)) = codBuscar Then
+            filaC = r
+            Exit For
+        End If
+    Next r
+    
+    If filaC = 0 Then
+        MsgBox "No encontré el fondo en Cuadro Locales"
+        Exit Sub
+    End If
+    
+    Dim colJun As Long: colJun = 0
+    Dim ultC As Long: ultC = wsCuadroLoc.Cells(1, wsCuadroLoc.Columns.Count).End(xlToLeft).Column
+    Dim c As Long
+    For c = 3 To ultC
+        If LCase(Trim(CStr(wsCuadroLoc.Cells(1, c).Value))) = "jun-26" Then
+            colJun = c
+            Exit For
+        End If
+    Next c
+    
+    If colJun = 0 Then
+        MsgBox "No encontré jun-26 en Cuadro Locales"
+        Exit Sub
+    End If
+    
+    Dim vRet As Variant
+    vRet = wsCuadroLoc.Cells(filaC, colJun).Value
+    
+    msj = msj & "1. RETORNO en Cuadro Locales (jun-26):" & vbCrLf
+    msj = msj & "   .Value = " & vRet & vbCrLf
+    msj = msj & "   TypeName = " & TypeName(vRet) & vbCrLf
+    msj = msj & "   Si lo multiplicas por 100: " & (CDbl(vRet) * 100) & "%" & vbCrLf & vbCrLf
+    
+    ' 2. Peso en hoja Pesos (versión vieja: dic-25)
+    Dim pesosF2 As Object: Set pesosF2 = LeerPesosDic25(wsPesos, "FONDO 2")
+    Dim pesosF3 As Object: Set pesosF3 = LeerPesosDic25(wsPesos, "FONDO 3")
+    
+    Dim pesoUsar As Double: pesoUsar = 0
+    Dim fondoUsar As String: fondoUsar = ""
+    If pesosF2.exists(codBuscar) Then
+        pesoUsar = CDbl(pesosF2(codBuscar))
+        fondoUsar = "F2"
+    ElseIf pesosF3.exists(codBuscar) Then
+        pesoUsar = CDbl(pesosF3(codBuscar))
+        fondoUsar = "F3"
+    End If
+    
+    msj = msj & "2. PESO leído (Dic-25) " & fondoUsar & ":" & vbCrLf
+    msj = msj & "   Valor crudo = " & pesoUsar & vbCrLf
+    msj = msj & "   En %: " & (pesoUsar * 100) & "%" & vbCrLf & vbCrLf
+    
+    ' 3. Cálculo manual
+    Dim calc As Double
+    calc = CDbl(vRet) * pesoUsar
+    msj = msj & "3. CÁLCULO ESPERADO (retorno × peso):" & vbCrLf
+    msj = msj & "   = " & vRet & " × " & pesoUsar & vbCrLf
+    msj = msj & "   = " & calc & vbCrLf
+    msj = msj & "   En %: " & (calc * 100) & "%" & vbCrLf & vbCrLf
+    
+    ' 4. Valor real en PxR
+    Dim filaP As Long: filaP = 0
+    Dim ultP As Long: ultP = wsPxR.Cells(wsPxR.Rows.Count, 2).End(xlUp).Row
+    For r = 1 To ultP
+        If Trim(CStr(wsPxR.Cells(r, 2).Value)) = codBuscar Then
+            filaP = r
+            Exit For
+        End If
+    Next r
+    
+    If filaP > 0 Then
+        Dim filaEnc As Long: filaEnc = 0
+        For r = filaP - 1 To 1 Step -1
+            If LCase(Trim(CStr(wsPxR.Cells(r, 5).Value))) = "dic-25" Then
+                filaEnc = r
+                Exit For
+            End If
+        Next r
+        
+        Dim colJunP As Long: colJunP = 0
+        Dim ultCP As Long: ultCP = wsPxR.Cells(filaEnc, wsPxR.Columns.Count).End(xlToLeft).Column
+        For c = 5 To ultCP
+            If LCase(Trim(CStr(wsPxR.Cells(filaEnc, c).Value))) = "jun-26" Then
+                colJunP = c
+                Exit For
+            End If
+        Next c
+        
+        If colJunP > 0 Then
+            Dim vPxR As Variant
+            vPxR = wsPxR.Cells(filaP, colJunP).Value
+            msj = msj & "4. VALOR ACTUAL en Pesos x Retornos (jun-26):" & vbCrLf
+            msj = msj & "   .Value = " & vPxR & vbCrLf
+            msj = msj & "   En %: " & (CDbl(vPxR) * 100) & "%" & vbCrLf
+        End If
+    End If
+    
+    MsgBox msj, vbInformation, "Verificación"
+End Sub
+
+
