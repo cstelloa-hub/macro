@@ -1,35 +1,108 @@
-Sub VerificarVersion()
+Sub DiagnosticoSimple()
+    Dim codFondo As String
+    codFondo = InputBox("Código SBS del fondo:", "Diagnóstico")
+    If codFondo = "" Then Exit Sub
+    codFondo = Trim(codFondo)
+    
+    Dim wsCuadroLoc As Worksheet, wsCuadroExt As Worksheet, wsPesos As Worksheet, wsPxR As Worksheet
+    Set wsCuadroLoc = ThisWorkbook.Sheets("Cuadro Locales")
+    Set wsCuadroExt = ThisWorkbook.Sheets("Cuadro Extranjeros")
+    Set wsPesos = ThisWorkbook.Sheets("Pesos")
+    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
+    
     Dim msj As String
-    msj = "VERIFICACIÓN DE VERSIÓN" & vbCrLf & vbCrLf
+    msj = "DIAGNÓSTICO PARA: " & codFondo & vbCrLf & vbCrLf
     
-    ' Verificar si existe LeerPesosPorMes
-    Dim tieneLeerPesosPorMes As Boolean: tieneLeerPesosPorMes = False
-    Dim tieneTrimestreAMesUltimo As Boolean: tieneTrimestreAMesUltimo = False
+    ' 1. PESO DIC-25 leído por la macro
+    Dim pesosF2 As Object: Set pesosF2 = LeerPesosDic25(wsPesos, "FONDO 2")
+    Dim pesosF3 As Object: Set pesosF3 = LeerPesosDic25(wsPesos, "FONDO 3")
     
-    On Error Resume Next
-    Dim ws As Worksheet: Set ws = ThisWorkbook.Sheets("Pesos")
-    Dim resultado As Object
-    Set resultado = Application.Run("LeerPesosPorMes", ws, "FONDO 2")
-    If Not resultado Is Nothing Then tieneLeerPesosPorMes = True
-    Err.Clear
-    
-    Dim test As String
-    test = Application.Run("TrimestreAMesUltimo", "q1-2026")
-    If test <> "" Then tieneTrimestreAMesUltimo = True
-    Err.Clear
-    On Error GoTo 0
-    
-    If tieneLeerPesosPorMes Then
-        msj = msj & "✓ Funcion LeerPesosPorMes EXISTE (versión nueva)" & vbCrLf
-    Else
-        msj = msj & "✗ Funcion LeerPesosPorMes NO existe (tienes versión vieja)" & vbCrLf
+    msj = msj & "PESO DIC-25 leído:" & vbCrLf
+    If pesosF2.exists(codFondo) Then
+        msj = msj & "  F2: " & Format(CDbl(pesosF2(codFondo)), "0.0000%") & vbCrLf
+    End If
+    If pesosF3.exists(codFondo) Then
+        msj = msj & "  F3: " & Format(CDbl(pesosF3(codFondo)), "0.0000%") & vbCrLf
+    End If
+    If Not pesosF2.exists(codFondo) And Not pesosF3.exists(codFondo) Then
+        msj = msj & "  ⚠ NO ENCONTRADO en F2 ni F3" & vbCrLf
     End If
     
-    If tieneTrimestreAMesUltimo Then
-        msj = msj & "✓ Funcion TrimestreAMesUltimo EXISTE" & vbCrLf
-    Else
-        msj = msj & "✗ Funcion TrimestreAMesUltimo NO existe" & vbCrLf
+    ' 2. RETORNOS por mes
+    Dim wsCuadroUsar As Worksheet
+    Dim filaC As Long: filaC = 0
+    Dim r As Long
+    
+    ' Buscar en Locales
+    Dim ultL As Long: ultL = wsCuadroLoc.Cells(wsCuadroLoc.Rows.Count, 2).End(xlUp).Row
+    For r = 2 To ultL
+        If Trim(CStr(wsCuadroLoc.Cells(r, 2).Value)) = codFondo Then
+            filaC = r
+            Set wsCuadroUsar = wsCuadroLoc
+            Exit For
+        End If
+    Next r
+    
+    ' Buscar en Extranjeros
+    If filaC = 0 Then
+        Dim ultE As Long: ultE = wsCuadroExt.Cells(wsCuadroExt.Rows.Count, 2).End(xlUp).Row
+        For r = 2 To ultE
+            If Trim(CStr(wsCuadroExt.Cells(r, 2).Value)) = codFondo Then
+                filaC = r
+                Set wsCuadroUsar = wsCuadroExt
+                Exit For
+            End If
+        Next r
     End If
     
-    MsgBox msj, vbInformation
+    msj = msj & vbCrLf & "RETORNOS POR MES en " & wsCuadroUsar.Name & ":" & vbCrLf
+    If filaC > 0 Then
+        Dim ultC As Long: ultC = wsCuadroUsar.Cells(1, wsCuadroUsar.Columns.Count).End(xlToLeft).Column
+        Dim c As Long
+        For c = 3 To ultC
+            Dim enc As String: enc = CStr(wsCuadroUsar.Cells(1, c).Value)
+            Dim v As Variant: v = wsCuadroUsar.Cells(filaC, c).Value
+            msj = msj & "  " & enc & " = "
+            If IsNumeric(v) And v <> "" Then
+                msj = msj & Format(CDbl(v), "0.0000%")
+            Else
+                msj = msj & "vacío"
+            End If
+            msj = msj & vbCrLf
+        Next c
+    Else
+        msj = msj & "  NO ESTÁ en Cuadro" & vbCrLf
+    End If
+    
+    ' 3. VALOR EN PxR
+    msj = msj & vbCrLf & "EN PESOS x RETORNOS (lo que sale):" & vbCrLf
+    Dim ultP As Long: ultP = wsPxR.Cells(wsPxR.Rows.Count, 2).End(xlUp).Row
+    Dim filaP As Long: filaP = 0
+    For r = 1 To ultP
+        If Trim(CStr(wsPxR.Cells(r, 2).Value)) = codFondo Then
+            filaP = r
+            Exit For
+        End If
+    Next r
+    
+    If filaP > 0 Then
+        Dim filaEnc As Long: filaEnc = 0
+        For r = filaP - 1 To 1 Step -1
+            If LCase(Trim(CStr(wsPxR.Cells(r, 5).Value))) = "dic-25" Then
+                filaEnc = r
+                Exit For
+            End If
+        Next r
+        
+        If filaEnc > 0 Then
+            Dim ultCp As Long: ultCp = wsPxR.Cells(filaEnc, wsPxR.Columns.Count).End(xlToLeft).Column
+            For c = 5 To ultCp
+                Dim enc3 As String: enc3 = CStr(wsPxR.Cells(filaEnc, c).Value)
+                Dim v3 As Variant: v3 = wsPxR.Cells(filaP, c).Value
+                msj = msj & "  " & enc3 & " = " & Format(CDbl(v3), "0.0000%") & vbCrLf
+            Next c
+        End If
+    End If
+    
+    MsgBox msj, vbInformation, "Diagnóstico"
 End Sub
