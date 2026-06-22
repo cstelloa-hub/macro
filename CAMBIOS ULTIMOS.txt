@@ -147,3 +147,101 @@ SiguienteBloque:
     
     wsData.Columns("A:E").AutoFit
 End Sub
+
+
+Sub VerTipoCeldaMarcas()
+    Dim codBuscar As String
+    codBuscar = InputBox("Código SBS del fondo:", "Verificar Marcas")
+    If codBuscar = "" Then Exit Sub
+    codBuscar = Trim(codBuscar)
+    
+    Dim rutaMarcas As Variant
+    rutaMarcas = Application.GetOpenFilename( _
+        FileFilter:="Archivos Excel (*.xlsx;*.xlsm), *.xlsx;*.xlsm", _
+        Title:="Selecciona Marcas.xlsx")
+    If rutaMarcas = False Then Exit Sub
+    
+    Application.ScreenUpdating = False
+    Dim wbMarcas As Workbook
+    Set wbMarcas = Workbooks.Open(Filename:=CStr(rutaMarcas), ReadOnly:=True, UpdateLinks:=0)
+    
+    Dim ws As Worksheet
+    Dim hojaUsar As String
+    hojaUsar = InputBox("¿Local o Extranjero? (L o E)", "Hoja")
+    On Error Resume Next
+    If UCase(hojaUsar) = "L" Then
+        Set ws = wbMarcas.Sheets("1")
+    Else
+        Set ws = wbMarcas.Sheets("2")
+    End If
+    On Error GoTo 0
+    
+    Dim ultCol As Long
+    ultCol = ws.Cells(3, ws.Columns.Count).End(xlToLeft).Column
+    If ultCol > 2000 Then ultCol = 2000
+    
+    ' Buscar fondo
+    Dim colFondo As Long: colFondo = 0
+    Dim j As Long
+    For j = 1 To ultCol
+        If Trim(CStr(ws.Cells(2, j).Value)) = codBuscar Then
+            colFondo = j
+            Exit For
+        End If
+    Next j
+    
+    If colFondo = 0 Then
+        wbMarcas.Close False
+        MsgBox "No encontré el código"
+        Exit Sub
+    End If
+    
+    ' Buscar columna Var.Adj. en el bloque
+    Dim colFin As Long: colFin = ultCol
+    For j = colFondo + 1 To ultCol
+        If Trim(CStr(ws.Cells(2, j).Value)) <> "" Then
+            colFin = j - 1
+            Exit For
+        End If
+    Next j
+    
+    Dim colVar As Long: colVar = 0
+    For j = colFondo To colFin
+        Dim hh As String
+        hh = LCase(Replace(Trim(CStr(ws.Cells(3, j).Value)), " ", ""))
+        If hh = "var.adj." Or hh = "var.adj" Or hh = "varadj" Or hh = "varadj." Then colVar = j
+    Next j
+    
+    Dim msj As String
+    msj = "Fondo en col " & colFondo & ", Var.Adj. en col " & colVar & vbCrLf & vbCrLf
+    
+    If colVar > 0 Then
+        msj = msj & "PRIMERAS 3 VAR.ADJ. del fondo:" & vbCrLf & vbCrLf
+        
+        Dim r As Long, contador As Long: contador = 0
+        For r = 4 To 100
+            Dim v As Variant
+            v = ws.Cells(r, colVar).Value
+            
+            Dim vTxt As Variant
+            vTxt = ws.Cells(r, colVar).Text  ' lo que se ve en la celda
+            
+            If v <> "" Then
+                contador = contador + 1
+                msj = msj & "Fila " & r & ":" & vbCrLf
+                msj = msj & "  .Value = '" & v & "'" & vbCrLf
+                msj = msj & "  TypeName = " & TypeName(v) & vbCrLf
+                msj = msj & "  IsNumeric = " & IsNumeric(v) & vbCrLf
+                msj = msj & "  .Text (lo visible) = '" & vTxt & "'" & vbCrLf
+                msj = msj & "  NumberFormat = '" & ws.Cells(r, colVar).NumberFormat & "'" & vbCrLf
+                msj = msj & vbCrLf
+                If contador >= 3 Then Exit For
+            End If
+        Next r
+    End If
+    
+    wbMarcas.Close False
+    Application.ScreenUpdating = True
+    
+    MsgBox msj, vbInformation
+End Sub
