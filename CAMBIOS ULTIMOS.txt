@@ -586,3 +586,155 @@ Private Function OrdenarDictPorValor(dic As Object, desc As Boolean) As Collecti
     Set OrdenarDictPorValor = resultado
 End Function
 
+
+
+
+OTRA MACROOO
+
+
+Modificación 1: ActualizarTodo
+Busca esta macro y al final, antes de la línea MsgBox "Actualización completa...", agrega el bloque de formato. Te muestro cómo queda:
+vbaSub ActualizarTodo()
+    
+    Dim respuesta As VbMsgBoxResult
+    respuesta = MsgBox("Esto va a:" & vbCrLf & vbCrLf & _
+                       "1. Extraer data cruda de Marcas.xlsx" & vbCrLf & _
+                       "2. Regenerar Cuadro Locales y Cuadro Extranjeros" & vbCrLf & _
+                       "3. Regenerar Base 100 y Gráficos" & vbCrLf & _
+                       "4. Regenerar Pesos x Retornos" & vbCrLf & _
+                       "5. Regenerar Resumen Total" & vbCrLf & vbCrLf & _
+                       "¿Continuar?", vbYesNo + vbQuestion, "Actualizar Todo")
+    
+    If respuesta = vbNo Then Exit Sub
+    
+    Dim tInicio As Double
+    tInicio = Timer
+    
+    Application.StatusBar = "Paso 1 de 5: Extrayendo data..."
+    ExtraerData
+    
+    Application.StatusBar = "Paso 2 de 5: Generando cuadros..."
+    GenerarCuadros
+    
+    Application.StatusBar = "Paso 3 de 5: Generando Base 100 y Gráficos..."
+    GenerarBase100YGraficos
+    
+    Application.StatusBar = "Paso 4 de 5: Generando Pesos x Retornos..."
+    GenerarPesosXRetornos
+    
+    Application.StatusBar = "Paso 5 de 5: Generando Resumen Total..."
+    GenerarResumenTotal
+    
+    ' ===== NUEVO: Aplicar formato Profuturo a todas las hojas =====
+    Application.StatusBar = "Aplicando formato institucional..."
+    Dim wsFormato As Worksheet
+    For Each wsFormato In ThisWorkbook.Sheets
+        AplicarFormatoInstitucional wsFormato
+    Next wsFormato
+    ' ============================================================
+    
+    Application.StatusBar = False
+    
+    Dim duracion As Double
+    duracion = Timer - tInicio
+    
+    MsgBox "Actualización completa en " & Format(duracion, "0.0") & " segundos.", vbInformation, "Listo"
+
+End Sub
+
+Modificación 2: ActualizarResumenTotal
+Busca esta macro y al final, antes del MsgBox "Resumen Total actualizado...", agrega una línea:
+vbaSub ActualizarResumenTotal()
+    Dim wb As Workbook
+    Set wb = ThisWorkbook
+    
+    Dim wsPxR As Worksheet, wsDest As Worksheet, wsCuadroLoc As Worksheet
+    
+    On Error Resume Next
+    Set wsPxR = wb.Sheets("Pesos x Retornos")
+    Set wsDest = wb.Sheets("Resumen Total")
+    Set wsCuadroLoc = wb.Sheets("Cuadro Locales")
+    On Error GoTo 0
+    
+    If wsPxR Is Nothing Or wsDest Is Nothing Then
+        MsgBox "Faltan hojas. Ejecuta primero GenerarResumenTotal.", vbCritical
+        Exit Sub
+    End If
+    
+    Dim mesUsar As String
+    mesUsar = Trim(CStr(wsDest.Range("B1").Value))
+    
+    If mesUsar = "" Then
+        MsgBox "B1 está vacío. Selecciona un mes del menú desplegable.", vbExclamation
+        Exit Sub
+    End If
+    
+    Dim existe As Boolean: existe = False
+    If Not wsCuadroLoc Is Nothing Then
+        Dim ultColLoc As Long
+        ultColLoc = wsCuadroLoc.Cells(1, wsCuadroLoc.Columns.Count).End(xlToLeft).Column
+        Dim c As Long
+        For c = 3 To ultColLoc
+            If LCase(Trim(CStr(wsCuadroLoc.Cells(1, c).Value))) = LCase(mesUsar) Then
+                existe = True
+                Exit For
+            End If
+        Next c
+    End If
+    
+    If Not existe Then
+        MsgBox "El mes '" & mesUsar & "' no está en Cuadro Locales. Selecciona uno del menú desplegable.", vbExclamation
+        Exit Sub
+    End If
+    
+    Application.ScreenUpdating = False
+    
+    Dim ultFilaDest As Long
+    ultFilaDest = wsDest.Cells(wsDest.Rows.Count, 1).End(xlUp).Row
+    If ultFilaDest >= 3 Then
+        wsDest.Range("A3:Z" & ultFilaDest).Clear
+    End If
+    
+    Dim filaActual As Long: filaActual = 3
+    filaActual = ArmarBloqueResumen(wsDest, filaActual, wsPxR, "FONDO 2", "Fondo 2", mesUsar)
+    filaActual = filaActual + 2
+    filaActual = ArmarBloqueResumen(wsDest, filaActual, wsPxR, "FONDO 3", "Fondo 3", mesUsar)
+    
+    wsDest.Columns("A:D").AutoFit
+    
+    ' ===== NUEVO: Aplicar formato Profuturo =====
+    AplicarFormatoInstitucional wsDest
+    ' ============================================
+    
+    Application.ScreenUpdating = True
+    
+    MsgBox "Resumen Total actualizado para el mes: " & mesUsar, vbInformation
+End Sub
+
+Modificación 3: ActualizarTopBottom y GenerarTopBottomContribuidores
+Ambas llaman a GenerarTopBottomInterno. Modifica esa función agregando el formato al final:
+vbaPrivate Sub GenerarTopBottomInterno(conGraficos As Boolean)
+    ' ... (todo el código de arriba se queda igual)
+    ' ...
+    ' ...
+    
+    filaActual = ArmarBloqueTopBottom(wsDest, filaActual, wsPxR, wsCuadroExt, "EXTRANJERO", "Fondo 3", "FONDO 3 - EXTRANJERO", mesSel, conGraficos)
+    
+    wsDest.Columns("A:L").AutoFit
+    
+    ' ===== NUEVO: Aplicar formato Profuturo =====
+    AplicarFormatoInstitucional wsDest
+    ' ============================================
+    
+    wsDest.Activate
+    wsDest.Range("A1").Select
+    
+    Application.ScreenUpdating = True
+End Sub
+
+
+
+
+
+
+
