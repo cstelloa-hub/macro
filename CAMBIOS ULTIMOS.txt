@@ -1,371 +1,588 @@
-Private Sub VolcarData(wsMarcas As Worksheet, wsData As Worksheet)
-    
-    wsData.Cells.Clear
-    
-    ' 5 COLUMNAS (con EEFF)
-    wsData.Range("A1").Value = "Código SBS"
-    wsData.Range("B1").Value = "Nombre Fondo"
-    wsData.Range("C1").Value = "Día"
-    wsData.Range("D1").Value = "EEFF"
-    wsData.Range("E1").Value = "Var.Adj."
-    wsData.Range("A1:E1").Font.Bold = True
-    wsData.Range("A1:E1").Interior.Color = RGB(200, 215, 235)
-    
-    Dim ultCol As Long, ultFila As Long
-    ultCol = wsMarcas.Cells(3, wsMarcas.Columns.Count).End(xlToLeft).Column
-    If ultCol < 1 Then Exit Sub
-    If ultCol > 2000 Then ultCol = 2000
-    
-    ultFila = wsMarcas.UsedRange.Rows.Count
-    If ultFila > 1000 Then ultFila = 1000
-    If ultFila < 5 Then ultFila = 5
-    
-    Dim arrMarcas As Variant
-    arrMarcas = wsMarcas.Range(wsMarcas.Cells(1, 1), wsMarcas.Cells(ultFila, ultCol)).Value
-    
-    Dim colsInicio As Collection
-    Set colsInicio = New Collection
-    
-    Dim j As Long
-    For j = 1 To ultCol
-        Dim h As String
-        h = LCase(Trim(CStr(arrMarcas(3, j))))
-        If h = "día" Or h = "dia" Then colsInicio.Add j
-    Next j
-    
-    If colsInicio.Count = 0 Then Exit Sub
-    
-    Dim arrSalida() As Variant
-    ReDim arrSalida(1 To 100000, 1 To 5)
-    Dim filaSal As Long: filaSal = 0
-    
-    Dim b As Long
-    For b = 1 To colsInicio.Count
-        Dim colIni As Long, colFin As Long
-        colIni = colsInicio(b)
-        If b < colsInicio.Count Then
-            colFin = colsInicio(b + 1) - 1
-        Else
-            colFin = ultCol
-        End If
-        
-        Dim nombre As String, codigo As String
-        nombre = Trim(CStr(arrMarcas(1, colIni)))
-        codigo = Trim(CStr(arrMarcas(2, colIni)))
-        
-        Dim colVar As Long: colVar = 0
-        Dim colEEFF As Long: colEEFF = 0
-        For j = colIni To colFin
-            Dim hh As String
-            hh = LCase(Replace(Trim(CStr(arrMarcas(3, j))), " ", ""))
-            Select Case hh
-                Case "var.adj.", "var.adj", "varadj", "varadj.", "variaciónajustada", "variacionajustada"
-                    colVar = j
-                Case "eeff", "ee.ff.", "ee.ff", "ef.fi.", "eff", "estadosfinancieros"
-                    colEEFF = j
-            End Select
-        Next j
-        
-        If codigo = "" Or colVar = 0 Then GoTo SiguienteBloque
-        
-        Dim rr As Long, vaciosSeguidos As Long
-        vaciosSeguidos = 0
-        rr = 4
-        Do
-            If rr > ultFila Then Exit Do
-            
-            Dim vFch As Variant
-            vFch = arrMarcas(rr, colIni)
-            
-            If IsDate(vFch) Then
-                vaciosSeguidos = 0
-                Dim vVar As Variant
-                vVar = arrMarcas(rr, colVar)
-                
-                ' Limpiar el valor: si es texto con %, sacarle el % y dividir entre 100
-                Dim vVarStr As String
-                vVarStr = CStr(vVar)
-                Dim teniaPorcentaje As Boolean
-                teniaPorcentaje = (InStr(vVarStr, "%") > 0)
-                vVarStr = Replace(vVarStr, "%", "")
-                vVarStr = Replace(vVarStr, ",", ".")
-                vVarStr = Trim(vVarStr)
-                
-                If IsNumeric(vVarStr) Then
-                    Dim varNumLimpio As Double
-                    varNumLimpio = CDbl(vVarStr)
-                    
-                    ' Si tenía %, dividir entre 100 para convertir a decimal
-                    If teniaPorcentaje Then
-                        varNumLimpio = varNumLimpio / 100
-                    End If
-                    
-                    filaSal = filaSal + 1
-                    arrSalida(filaSal, 1) = codigo
-                    arrSalida(filaSal, 2) = nombre
-                    arrSalida(filaSal, 3) = CDate(vFch)
-                    
-                    If colEEFF > 0 Then
-                        arrSalida(filaSal, 4) = arrMarcas(rr, colEEFF)
-                    Else
-                        arrSalida(filaSal, 4) = ""
-                    End If
-                    
-                    arrSalida(filaSal, 5) = varNumLimpio
-                End If
-            Else
-                Dim txt As String
-                txt = LCase(Trim(CStr(vFch)))
-                If txt = "f1" Or txt = "cc" Or txt = "dd" Or txt = "nav" Or txt = "%" Then Exit Do
-                If txt = "" Then
-                    vaciosSeguidos = vaciosSeguidos + 1
-                    If vaciosSeguidos > 30 Then Exit Do
-                Else
-                    Exit Do
-                End If
-            End If
-            rr = rr + 1
-        Loop
-        
-SiguienteBloque:
-    Next b
-    
-    If filaSal > 0 Then
-        Dim arrFinal() As Variant
-        ReDim arrFinal(1 To filaSal, 1 To 5)
-        Dim i As Long, kk As Long
-        For i = 1 To filaSal
-            For kk = 1 To 5
-                arrFinal(i, kk) = arrSalida(i, kk)
-            Next kk
-        Next i
-        
-        wsData.Range("A2").Resize(filaSal, 5).Value = arrFinal
-        wsData.Range("C2:C" & filaSal + 1).NumberFormat = "dd/mm/yyyy"
-        wsData.Range("E2:E" & filaSal + 1).NumberFormat = "0.00%"
-    End If
-    
-    wsData.Columns("A:E").AutoFit
+
+'==================================================================
+' TOP Y BOTTOM CONTRIBUIDORES (Pareto 80%)
+'==================================================================
+Sub GenerarTopBottomContribuidores()
+    GenerarTopBottomInterno True  ' True = generar gráficos
 End Sub
 
+Sub ActualizarTopBottom()
+    GenerarTopBottomInterno True
+    MsgBox "Top/Bottom actualizado.", vbInformation
+End Sub
 
-Sub VerTipoCeldaMarcas()
-    Dim codBuscar As String
-    codBuscar = InputBox("Código SBS del fondo:", "Verificar Marcas")
-    If codBuscar = "" Then Exit Sub
-    codBuscar = Trim(codBuscar)
+Private Sub GenerarTopBottomInterno(conGraficos As Boolean)
+    Dim wb As Workbook
+    Set wb = ThisWorkbook
     
-    Dim rutaMarcas As Variant
-    rutaMarcas = Application.GetOpenFilename( _
-        FileFilter:="Archivos Excel (*.xlsx;*.xlsm), *.xlsx;*.xlsm", _
-        Title:="Selecciona Marcas.xlsx")
-    If rutaMarcas = False Then Exit Sub
+    Dim wsPxR As Worksheet, wsResumen As Worksheet, wsCuadroLoc As Worksheet, wsCuadroExt As Worksheet
     
-    Application.ScreenUpdating = False
-    Dim wbMarcas As Workbook
-    Set wbMarcas = Workbooks.Open(Filename:=CStr(rutaMarcas), ReadOnly:=True, UpdateLinks:=0)
-    
-    Dim ws As Worksheet
-    Dim hojaUsar As String
-    hojaUsar = InputBox("¿Local o Extranjero? (L o E)", "Hoja")
     On Error Resume Next
-    If UCase(hojaUsar) = "L" Then
-        Set ws = wbMarcas.Sheets("1")
-    Else
-        Set ws = wbMarcas.Sheets("2")
-    End If
+    Set wsPxR = wb.Sheets("Pesos x Retornos")
+    Set wsResumen = wb.Sheets("Resumen Total")
+    Set wsCuadroLoc = wb.Sheets("Cuadro Locales")
+    Set wsCuadroExt = wb.Sheets("Cuadro Extranjeros")
     On Error GoTo 0
     
-    Dim ultCol As Long
-    ultCol = ws.Cells(3, ws.Columns.Count).End(xlToLeft).Column
-    If ultCol > 2000 Then ultCol = 2000
-    
-    ' Buscar fondo
-    Dim colFondo As Long: colFondo = 0
-    Dim j As Long
-    For j = 1 To ultCol
-        If Trim(CStr(ws.Cells(2, j).Value)) = codBuscar Then
-            colFondo = j
-            Exit For
-        End If
-    Next j
-    
-    If colFondo = 0 Then
-        wbMarcas.Close False
-        MsgBox "No encontré el código"
+    If wsPxR Is Nothing Then
+        MsgBox "Falta hoja 'Pesos x Retornos'.", vbCritical
         Exit Sub
     End If
     
-    ' Buscar columna Var.Adj. en el bloque
-    Dim colFin As Long: colFin = ultCol
-    For j = colFondo + 1 To ultCol
-        If Trim(CStr(ws.Cells(2, j).Value)) <> "" Then
-            colFin = j - 1
-            Exit For
-        End If
-    Next j
-    
-    Dim colVar As Long: colVar = 0
-    For j = colFondo To colFin
-        Dim hh As String
-        hh = LCase(Replace(Trim(CStr(ws.Cells(3, j).Value)), " ", ""))
-        If hh = "var.adj." Or hh = "var.adj" Or hh = "varadj" Or hh = "varadj." Then colVar = j
-    Next j
-    
-    Dim msj As String
-    msj = "Fondo en col " & colFondo & ", Var.Adj. en col " & colVar & vbCrLf & vbCrLf
-    
-    If colVar > 0 Then
-        msj = msj & "PRIMERAS 3 VAR.ADJ. del fondo:" & vbCrLf & vbCrLf
-        
-        Dim r As Long, contador As Long: contador = 0
-        For r = 4 To 100
-            Dim v As Variant
-            v = ws.Cells(r, colVar).Value
-            
-            Dim vTxt As Variant
-            vTxt = ws.Cells(r, colVar).Text  ' lo que se ve en la celda
-            
-            If v <> "" Then
-                contador = contador + 1
-                msj = msj & "Fila " & r & ":" & vbCrLf
-                msj = msj & "  .Value = '" & v & "'" & vbCrLf
-                msj = msj & "  TypeName = " & TypeName(v) & vbCrLf
-                msj = msj & "  IsNumeric = " & IsNumeric(v) & vbCrLf
-                msj = msj & "  .Text (lo visible) = '" & vTxt & "'" & vbCrLf
-                msj = msj & "  NumberFormat = '" & ws.Cells(r, colVar).NumberFormat & "'" & vbCrLf
-                msj = msj & vbCrLf
-                If contador >= 3 Then Exit For
-            End If
-        Next r
+    Dim mesSel As String: mesSel = ""
+    If Not wsResumen Is Nothing Then
+        mesSel = Trim(CStr(wsResumen.Range("B1").Value))
     End If
     
-    wbMarcas.Close False
-    Application.ScreenUpdating = True
+    If mesSel = "" Then
+        mesSel = InputBox("Escribe el mes a analizar (ej. may-26):", "Top/Bottom", "may-26")
+        If mesSel = "" Then Exit Sub
+    End If
     
-    MsgBox msj, vbInformation
+    Application.ScreenUpdating = False
+    
+    Dim wsDest As Worksheet
+    Set wsDest = ObtenerHoja(wb, "Top Bottom")
+    
+    ' Borrar gráficos previos
+    Dim ch As ChartObject
+    For Each ch In wsDest.ChartObjects
+        ch.Delete
+    Next ch
+    wsDest.Cells.Clear
+    
+    ' Encabezado
+    wsDest.Range("A1").Value = "Análisis de Contribuidores (80% Pareto)"
+    wsDest.Range("A1").Font.Bold = True
+    wsDest.Range("A1").Font.Size = 16
+    wsDest.Range("A1").Font.Color = RGB(180, 30, 30)
+    
+    wsDest.Range("A2").Value = "Mes seleccionado:"
+    wsDest.Range("A2").Font.Bold = True
+    wsDest.Range("B2").Value = mesSel
+    wsDest.Range("B2").Font.Bold = True
+    wsDest.Range("B2").Font.Size = 12
+    wsDest.Range("B2").Interior.Color = RGB(255, 240, 180)
+    wsDest.Range("B2").HorizontalAlignment = xlCenter
+    wsDest.Range("B2").Borders.LineStyle = xlContinuous
+    
+    wsDest.Range("D2").Value = "(Cambia el mes en Resumen Total B1 y vuelve a ejecutar)"
+    wsDest.Range("D2").Font.Italic = True
+    wsDest.Range("D2").Font.Color = RGB(120, 120, 120)
+    
+    Dim filaActual As Long: filaActual = 4
+    
+    filaActual = ArmarBloqueTopBottom(wsDest, filaActual, wsPxR, wsCuadroLoc, "LOCAL", "Fondo 2", "FONDO 2 - LOCAL", mesSel, conGraficos)
+    filaActual = filaActual + 3
+    
+    filaActual = ArmarBloqueTopBottom(wsDest, filaActual, wsPxR, wsCuadroExt, "EXTRANJERO", "Fondo 2", "FONDO 2 - EXTRANJERO", mesSel, conGraficos)
+    filaActual = filaActual + 3
+    
+    filaActual = ArmarBloqueTopBottom(wsDest, filaActual, wsPxR, wsCuadroLoc, "LOCAL", "Fondo 3", "FONDO 3 - LOCAL", mesSel, conGraficos)
+    filaActual = filaActual + 3
+    
+    filaActual = ArmarBloqueTopBottom(wsDest, filaActual, wsPxR, wsCuadroExt, "EXTRANJERO", "Fondo 3", "FONDO 3 - EXTRANJERO", mesSel, conGraficos)
+    
+    wsDest.Columns("A:L").AutoFit
+    wsDest.Activate
+    wsDest.Range("A1").Select
+    
+    Application.ScreenUpdating = True
 End Sub
 
-
-
-
-OTROOO
-
-Sub VerificarCalculoJunio()
-    Dim codBuscar As String
-    codBuscar = "5111102FIBR3"
+Private Function ArmarBloqueTopBottom(wsDest As Worksheet, filaInicio As Long, _
+                                       wsPxR As Worksheet, wsCuadro As Worksheet, _
+                                       origenBuscar As String, fondoBuscar As String, _
+                                       titulo As String, mesSel As String, _
+                                       conGraficos As Boolean) As Long
     
-    Dim wsCuadroLoc As Worksheet, wsPesos As Worksheet, wsPxR As Worksheet
-    Set wsCuadroLoc = ThisWorkbook.Sheets("Cuadro Locales")
-    Set wsPesos = ThisWorkbook.Sheets("Pesos")
-    Set wsPxR = ThisWorkbook.Sheets("Pesos x Retornos")
+    Dim fila As Long: fila = filaInicio
     
-    Dim msj As String
-    msj = "VERIFICACIÓN PARA " & codBuscar & " - JUN-26" & vbCrLf & vbCrLf
+    ' Título del bloque
+    wsDest.Cells(fila, 1).Value = titulo
+    wsDest.Cells(fila, 1).Font.Bold = True
+    wsDest.Cells(fila, 1).Font.Size = 14
+    wsDest.Cells(fila, 1).Font.Color = RGB(255, 255, 255)
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 12)).Interior.Color = RGB(70, 110, 170)
+    fila = fila + 1
     
-    ' 1. Retorno crudo (Value) en Cuadro Locales
-    Dim filaC As Long: filaC = 0
-    Dim ultF As Long: ultF = wsCuadroLoc.Cells(wsCuadroLoc.Rows.Count, 2).End(xlUp).Row
-    Dim r As Long
-    For r = 2 To ultF
-        If Trim(CStr(wsCuadroLoc.Cells(r, 2).Value)) = codBuscar Then
-            filaC = r
-            Exit For
-        End If
-    Next r
+    Dim info As String
+    info = LocalizarSeccionPxR(wsPxR, origenBuscar, fondoBuscar)
     
-    If filaC = 0 Then
-        MsgBox "No encontré el fondo en Cuadro Locales"
-        Exit Sub
+    If info = "" Then
+        wsDest.Cells(fila, 1).Value = "(no se encontró sección)"
+        ArmarBloqueTopBottom = fila + 1
+        Exit Function
     End If
     
-    Dim colJun As Long: colJun = 0
-    Dim ultC As Long: ultC = wsCuadroLoc.Cells(1, wsCuadroLoc.Columns.Count).End(xlToLeft).Column
+    Dim partes() As String
+    partes = Split(info, "|")
+    Dim filaEnc As Long: filaEnc = CLng(partes(0))
+    Dim colDic25 As Long: colDic25 = CLng(partes(1))
+    Dim colUltMes As Long: colUltMes = CLng(partes(2))
+    Dim filaMTD As Long: filaMTD = CLng(partes(3))
+    
+    Dim esTrimestral As Boolean: esTrimestral = False
+    If colUltMes > colDic25 Then
+        Dim primerEncab As String
+        primerEncab = LCase(Trim(CStr(wsPxR.Cells(filaEnc, colDic25 + 1).Value)))
+        If InStr(primerEncab, "q") = 1 Then esTrimestral = True
+    End If
+    
+    Dim colMesSel As Long: colMesSel = 0
     Dim c As Long
-    For c = 3 To ultC
-        If LCase(Trim(CStr(wsCuadroLoc.Cells(1, c).Value))) = "jun-26" Then
-            colJun = c
-            Exit For
-        End If
-    Next c
-    
-    If colJun = 0 Then
-        MsgBox "No encontré jun-26 en Cuadro Locales"
-        Exit Sub
-    End If
-    
-    Dim vRet As Variant
-    vRet = wsCuadroLoc.Cells(filaC, colJun).Value
-    
-    msj = msj & "1. RETORNO en Cuadro Locales (jun-26):" & vbCrLf
-    msj = msj & "   .Value = " & vRet & vbCrLf
-    msj = msj & "   TypeName = " & TypeName(vRet) & vbCrLf
-    msj = msj & "   Si lo multiplicas por 100: " & (CDbl(vRet) * 100) & "%" & vbCrLf & vbCrLf
-    
-    ' 2. Peso en hoja Pesos (versión vieja: dic-25)
-    Dim pesosF2 As Object: Set pesosF2 = LeerPesosDic25(wsPesos, "FONDO 2")
-    Dim pesosF3 As Object: Set pesosF3 = LeerPesosDic25(wsPesos, "FONDO 3")
-    
-    Dim pesoUsar As Double: pesoUsar = 0
-    Dim fondoUsar As String: fondoUsar = ""
-    If pesosF2.exists(codBuscar) Then
-        pesoUsar = CDbl(pesosF2(codBuscar))
-        fondoUsar = "F2"
-    ElseIf pesosF3.exists(codBuscar) Then
-        pesoUsar = CDbl(pesosF3(codBuscar))
-        fondoUsar = "F3"
-    End If
-    
-    msj = msj & "2. PESO leído (Dic-25) " & fondoUsar & ":" & vbCrLf
-    msj = msj & "   Valor crudo = " & pesoUsar & vbCrLf
-    msj = msj & "   En %: " & (pesoUsar * 100) & "%" & vbCrLf & vbCrLf
-    
-    ' 3. Cálculo manual
-    Dim calc As Double
-    calc = CDbl(vRet) * pesoUsar
-    msj = msj & "3. CÁLCULO ESPERADO (retorno × peso):" & vbCrLf
-    msj = msj & "   = " & vRet & " × " & pesoUsar & vbCrLf
-    msj = msj & "   = " & calc & vbCrLf
-    msj = msj & "   En %: " & (calc * 100) & "%" & vbCrLf & vbCrLf
-    
-    ' 4. Valor real en PxR
-    Dim filaP As Long: filaP = 0
-    Dim ultP As Long: ultP = wsPxR.Cells(wsPxR.Rows.Count, 2).End(xlUp).Row
-    For r = 1 To ultP
-        If Trim(CStr(wsPxR.Cells(r, 2).Value)) = codBuscar Then
-            filaP = r
-            Exit For
-        End If
-    Next r
-    
-    If filaP > 0 Then
-        Dim filaEnc As Long: filaEnc = 0
-        For r = filaP - 1 To 1 Step -1
-            If LCase(Trim(CStr(wsPxR.Cells(r, 5).Value))) = "dic-25" Then
-                filaEnc = r
-                Exit For
-            End If
-        Next r
-        
-        Dim colJunP As Long: colJunP = 0
-        Dim ultCP As Long: ultCP = wsPxR.Cells(filaEnc, wsPxR.Columns.Count).End(xlToLeft).Column
-        For c = 5 To ultCP
-            If LCase(Trim(CStr(wsPxR.Cells(filaEnc, c).Value))) = "jun-26" Then
-                colJunP = c
+    If esTrimestral Then
+        Dim trObj As String: trObj = MesATrimestre(mesSel)
+        For c = colDic25 + 1 To colUltMes
+            If LCase(Trim(CStr(wsPxR.Cells(filaEnc, c).Value))) = LCase(trObj) Then
+                colMesSel = c
                 Exit For
             End If
         Next c
-        
-        If colJunP > 0 Then
-            Dim vPxR As Variant
-            vPxR = wsPxR.Cells(filaP, colJunP).Value
-            msj = msj & "4. VALOR ACTUAL en Pesos x Retornos (jun-26):" & vbCrLf
-            msj = msj & "   .Value = " & vPxR & vbCrLf
-            msj = msj & "   En %: " & (CDbl(vPxR) * 100) & "%" & vbCrLf
+        If colMesSel = 0 Then
+            Dim mc As Long: mc = 0
+            For c = colDic25 + 1 To colUltMes
+                Dim tre As String: tre = Trim(CStr(wsPxR.Cells(filaEnc, c).Value))
+                If tre <> "" Then
+                    If TrimestreComparable(tre) <= TrimestreComparable(trObj) Then mc = c
+                End If
+            Next c
+            colMesSel = mc
         End If
+    Else
+        For c = colDic25 To colUltMes
+            If LCase(Trim(CStr(wsPxR.Cells(filaEnc, c).Value))) = LCase(mesSel) Then
+                colMesSel = c
+                Exit For
+            End If
+        Next c
     End If
     
-    MsgBox msj, vbInformation, "Verificación"
+    If colMesSel = 0 Then
+        wsDest.Cells(fila, 1).Value = "(no se encontró el mes " & mesSel & ")"
+        ArmarBloqueTopBottom = fila + 1
+        Exit Function
+    End If
+    
+    Dim primerMesCol As Long: primerMesCol = colDic25 + 1
+    
+    ' Leer todos los fondos del bloque
+    Dim fondos As Object: Set fondos = CreateObject("Scripting.Dictionary")
+    
+    Dim rr As Long
+    For rr = filaEnc + 1 To filaMTD - 1
+        Dim nombre As String, codigo As String, tipo As String
+        nombre = Trim(CStr(wsPxR.Cells(rr, 1).Value))
+        codigo = Trim(CStr(wsPxR.Cells(rr, 2).Value))
+        tipo = Trim(CStr(wsPxR.Cells(rr, 3).Value))
+        
+        If codigo = "" Then GoTo SiguienteFila
+        
+        Dim mtdF As Double: mtdF = 0
+        Dim vMtd As Variant: vMtd = wsPxR.Cells(rr, colMesSel).Value
+        If IsNumeric(vMtd) Then mtdF = CDbl(vMtd)
+        
+        ' YTD = SUMA SIMPLE de contribuciones
+        Dim ytdF As Double: ytdF = 0
+        If colMesSel >= primerMesCol Then
+            Dim cc As Long
+            For cc = primerMesCol To colMesSel
+                Dim vR As Variant: vR = wsPxR.Cells(rr, cc).Value
+                If IsNumeric(vR) Then ytdF = ytdF + CDbl(vR)
+            Next cc
+        End If
+        
+        ' Retorno y peso aproximados desde Cuadro
+        Dim retMes As Double: retMes = 0
+        Dim pesoApprox As Double: pesoApprox = 0
+        
+        Dim filaCuadro As Long: filaCuadro = 0
+        Dim ultFC As Long: ultFC = wsCuadro.Cells(wsCuadro.Rows.Count, 2).End(xlUp).Row
+        Dim rc As Long
+        For rc = 2 To ultFC
+            If Trim(CStr(wsCuadro.Cells(rc, 2).Value)) = codigo Then
+                filaCuadro = rc
+                Exit For
+            End If
+        Next rc
+        
+        If filaCuadro > 0 Then
+            Dim ultCC As Long: ultCC = wsCuadro.Cells(1, wsCuadro.Columns.Count).End(xlToLeft).Column
+            Dim cm As Long, mesABuscar As String
+            If esTrimestral Then
+                mesABuscar = MesATrimestre(mesSel)
+            Else
+                mesABuscar = mesSel
+            End If
+            For cm = 3 To ultCC
+                If LCase(Trim(CStr(wsCuadro.Cells(1, cm).Value))) = LCase(mesABuscar) Then
+                    Dim vRet As Variant: vRet = wsCuadro.Cells(filaCuadro, cm).Value
+                    If IsNumeric(vRet) Then retMes = CDbl(vRet)
+                    Exit For
+                End If
+            Next cm
+        End If
+        
+        If retMes <> 0 Then pesoApprox = mtdF / retMes
+        
+        Dim datos As String
+        datos = nombre & "|" & codigo & "|" & tipo & "|" & _
+                pesoApprox & "|" & retMes & "|" & mtdF & "|" & ytdF
+        fondos(codigo) = datos
+        
+SiguienteFila:
+    Next rr
+    
+    If fondos.Count = 0 Then
+        wsDest.Cells(fila, 1).Value = "(no hay fondos en este bloque)"
+        ArmarBloqueTopBottom = fila + 1
+        Exit Function
+    End If
+    
+    ' ============================
+    ' SECCIÓN MTD
+    ' ============================
+    wsDest.Cells(fila, 1).Value = "MTD - " & mesSel
+    wsDest.Cells(fila, 1).Font.Bold = True
+    wsDest.Cells(fila, 1).Font.Size = 12
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 12)).Interior.Color = RGB(200, 215, 235)
+    fila = fila + 1
+    
+    Dim filaInicioMTD As Long: filaInicioMTD = fila
+    fila = EscribirParetoTopBottom(wsDest, fila, fondos, 5, 6, conGraficos)  ' índices 5=MTD, 6=YTD
+    Dim filaFinMTD As Long: filaFinMTD = fila - 1
+    
+    fila = fila + 2
+    
+    ' ============================
+    ' SECCIÓN YTD
+    ' ============================
+    wsDest.Cells(fila, 1).Value = "YTD - hasta " & mesSel
+    wsDest.Cells(fila, 1).Font.Bold = True
+    wsDest.Cells(fila, 1).Font.Size = 12
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 12)).Interior.Color = RGB(220, 230, 200)
+    fila = fila + 1
+    
+    Dim filaInicioYTD As Long: filaInicioYTD = fila
+    fila = EscribirParetoTopBottom(wsDest, fila, fondos, 6, 5, conGraficos)
+    Dim filaFinYTD As Long: filaFinYTD = fila - 1
+    
+    ArmarBloqueTopBottom = fila
+End Function
+
+' Escribe el top y bottom (80% pareto) usando el índice indicado
+' idxOrden = 5 (MTD) o 6 (YTD)
+Private Function EscribirParetoTopBottom(wsDest As Worksheet, filaInicio As Long, _
+                                          fondos As Object, idxOrden As Long, idxOtro As Long, _
+                                          conGraficos As Boolean) As Long
+    Dim fila As Long: fila = filaInicio
+    
+    ' Encabezados
+    wsDest.Cells(fila, 1).Value = "TOP (positivos)"
+    wsDest.Cells(fila, 1).Font.Bold = True
+    wsDest.Cells(fila, 1).Interior.Color = RGB(200, 230, 200)
+    wsDest.Cells(fila, 7).Value = "BOTTOM (negativos)"
+    wsDest.Cells(fila, 7).Font.Bold = True
+    wsDest.Cells(fila, 7).Interior.Color = RGB(230, 200, 200)
+    fila = fila + 1
+    
+    wsDest.Cells(fila, 1).Value = "Fondo"
+    wsDest.Cells(fila, 2).Value = "Tipo"
+    wsDest.Cells(fila, 3).Value = "Peso"
+    wsDest.Cells(fila, 4).Value = "Retorno"
+    wsDest.Cells(fila, 5).Value = "Contrib."
+    wsDest.Cells(fila, 6).Value = "% Acum."
+    wsDest.Cells(fila, 7).Value = "Fondo"
+    wsDest.Cells(fila, 8).Value = "Tipo"
+    wsDest.Cells(fila, 9).Value = "Peso"
+    wsDest.Cells(fila, 10).Value = "Retorno"
+    wsDest.Cells(fila, 11).Value = "Contrib."
+    wsDest.Cells(fila, 12).Value = "% Acum."
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 12)).Font.Bold = True
+    wsDest.Range(wsDest.Cells(fila, 1), wsDest.Cells(fila, 12)).Interior.Color = RGB(240, 240, 220)
+    fila = fila + 1
+    
+    ' Separar positivos y negativos por el índice elegido
+    Dim positivos As Object: Set positivos = CreateObject("Scripting.Dictionary")
+    Dim negativos As Object: Set negativos = CreateObject("Scripting.Dictionary")
+    
+    Dim sumaPos As Double: sumaPos = 0
+    Dim sumaNeg As Double: sumaNeg = 0
+    
+    Dim k As Variant
+    For Each k In fondos.keys
+        Dim p() As String: p = Split(CStr(fondos(k)), "|")
+        Dim valOrden As Double: valOrden = CDbl(p(idxOrden))
+        If valOrden > 0 Then
+            positivos(k) = valOrden
+            sumaPos = sumaPos + valOrden
+        ElseIf valOrden < 0 Then
+            negativos(k) = valOrden
+            sumaNeg = sumaNeg + valOrden
+        End If
+    Next k
+    
+    Dim listaPos As Collection: Set listaPos = OrdenarDictPorValor(positivos, True)
+    Dim listaNeg As Collection: Set listaNeg = OrdenarDictPorValor(negativos, False)
+    
+    Dim filaT As Long: filaT = fila
+    Dim filaB As Long: filaB = fila
+    Dim acumP As Double: acumP = 0
+    Dim acumN As Double: acumN = 0
+    
+    Dim i As Long
+    
+    ' Top
+    For i = 1 To listaPos.Count
+        Dim codP As String: codP = CStr(listaPos(i))
+        Dim datosP() As String: datosP = Split(CStr(fondos(codP)), "|")
+        Dim valP As Double: valP = CDbl(datosP(idxOrden))
+        Dim pctP As Double: pctP = 0
+        If sumaPos > 0 Then pctP = valP / sumaPos
+        acumP = acumP + pctP
+        
+        wsDest.Cells(filaT, 1).Value = datosP(0)
+        wsDest.Cells(filaT, 2).Value = datosP(2)
+        wsDest.Cells(filaT, 3).Value = CDbl(datosP(3))
+        wsDest.Cells(filaT, 3).NumberFormat = "0.00%"
+        wsDest.Cells(filaT, 4).Value = CDbl(datosP(4))
+        wsDest.Cells(filaT, 4).NumberFormat = "0.00%"
+        wsDest.Cells(filaT, 5).Value = valP
+        wsDest.Cells(filaT, 5).NumberFormat = "0.0000%"
+        wsDest.Cells(filaT, 6).Value = acumP
+        wsDest.Cells(filaT, 6).NumberFormat = "0.0%"
+        
+        filaT = filaT + 1
+        If acumP >= 0.8 Then Exit For
+    Next i
+    
+    ' Bottom
+    For i = 1 To listaNeg.Count
+        Dim codN As String: codN = CStr(listaNeg(i))
+        Dim datosN() As String: datosN = Split(CStr(fondos(codN)), "|")
+        Dim valN As Double: valN = CDbl(datosN(idxOrden))
+        Dim pctN As Double: pctN = 0
+        If sumaNeg < 0 Then pctN = valN / sumaNeg
+        acumN = acumN + pctN
+        
+        wsDest.Cells(filaB, 7).Value = datosN(0)
+        wsDest.Cells(filaB, 8).Value = datosN(2)
+        wsDest.Cells(filaB, 9).Value = CDbl(datosN(3))
+        wsDest.Cells(filaB, 9).NumberFormat = "0.00%"
+        wsDest.Cells(filaB, 10).Value = CDbl(datosN(4))
+        wsDest.Cells(filaB, 10).NumberFormat = "0.00%"
+        wsDest.Cells(filaB, 11).Value = valN
+        wsDest.Cells(filaB, 11).NumberFormat = "0.0000%"
+        wsDest.Cells(filaB, 12).Value = acumN
+        wsDest.Cells(filaB, 12).NumberFormat = "0.0%"
+        
+        filaB = filaB + 1
+        If acumN >= 0.8 Then Exit For
+    Next i
+    
+    fila = Application.WorksheetFunction.Max(filaT, filaB)
+    
+    ' Totales
+    wsDest.Cells(fila, 1).Value = "Suma positivos:"
+    wsDest.Cells(fila, 1).Font.Bold = True
+    wsDest.Cells(fila, 5).Value = sumaPos
+    wsDest.Cells(fila, 5).NumberFormat = "0.0000%"
+    wsDest.Cells(fila, 5).Font.Bold = True
+    
+    wsDest.Cells(fila, 7).Value = "Suma negativos:"
+    wsDest.Cells(fila, 7).Font.Bold = True
+    wsDest.Cells(fila, 11).Value = sumaNeg
+    wsDest.Cells(fila, 11).NumberFormat = "0.0000%"
+    wsDest.Cells(fila, 11).Font.Bold = True
+    fila = fila + 1
+    
+    wsDest.Cells(fila, 1).Value = "Neto:"
+    wsDest.Cells(fila, 1).Font.Bold = True
+    wsDest.Cells(fila, 5).Value = sumaPos + sumaNeg
+    wsDest.Cells(fila, 5).NumberFormat = "0.0000%"
+    wsDest.Cells(fila, 5).Font.Bold = True
+    wsDest.Cells(fila, 5).Interior.Color = RGB(255, 240, 180)
+    fila = fila + 1
+    
+    ' Gráfico Pareto si se requiere
+    If conGraficos Then
+        CrearGraficoPareto wsDest, filaInicio, filaT - 1, filaB - 1, _
+                            "Top Contribuidores", "Bottom Contribuidores"
+    End If
+    
+    EscribirParetoTopBottom = fila
+End Function
+
+Private Sub CrearGraficoPareto(wsDest As Worksheet, filaEncab As Long, _
+                                ultFilaTop As Long, ultFilaBot As Long, _
+                                tituloTop As String, tituloBot As String)
+    
+    Dim filaDatosInicio As Long: filaDatosInicio = filaEncab + 2
+    
+    ' Gráfico Top
+    If ultFilaTop >= filaDatosInicio Then
+        Dim leftPos1 As Double, topPos1 As Double
+        leftPos1 = wsDest.Cells(filaEncab, 14).Left
+        topPos1 = wsDest.Cells(filaEncab, 14).Top
+        
+        Dim ch1 As ChartObject
+        Set ch1 = wsDest.ChartObjects.Add(Left:=leftPos1, Top:=topPos1, Width:=380, Height:=220)
+        
+        With ch1.Chart
+            .ChartType = xlColumnClustered
+            
+            ' Limpiar series existentes
+            Do While .SeriesCollection.Count > 0
+                .SeriesCollection(1).Delete
+            Loop
+            
+            ' Serie de contribuciones (barras)
+            Dim sBarra As Series
+            Set sBarra = .SeriesCollection.NewSeries
+            sBarra.Name = "Contribución"
+            sBarra.Values = wsDest.Range(wsDest.Cells(filaDatosInicio, 5), wsDest.Cells(ultFilaTop, 5))
+            sBarra.XValues = wsDest.Range(wsDest.Cells(filaDatosInicio, 1), wsDest.Cells(ultFilaTop, 1))
+            On Error Resume Next
+            sBarra.Format.Fill.ForeColor.RGB = RGB(70, 130, 180)
+            On Error GoTo 0
+            
+            ' Serie acumulado (línea) en eje secundario
+            Dim sLinea As Series
+            Set sLinea = .SeriesCollection.NewSeries
+            sLinea.Name = "% Acumulado"
+            sLinea.Values = wsDest.Range(wsDest.Cells(filaDatosInicio, 6), wsDest.Cells(ultFilaTop, 6))
+            sLinea.ChartType = xlLineMarkers
+            On Error Resume Next
+            sLinea.AxisGroup = xlSecondary
+            sLinea.Format.Line.ForeColor.RGB = RGB(220, 50, 50)
+            sLinea.Format.Line.Weight = 2.25
+            On Error GoTo 0
+            
+            .HasTitle = True
+            .ChartTitle.Text = tituloTop
+            .ChartTitle.Font.Size = 11
+            .ChartTitle.Font.Bold = True
+            
+            .HasLegend = True
+            .Legend.Position = xlLegendPositionBottom
+            .Legend.Font.Size = 8
+            
+            On Error Resume Next
+            .Axes(xlValue, xlPrimary).TickLabels.NumberFormat = "0.0000%"
+            .Axes(xlValue, xlPrimary).TickLabels.Font.Size = 8
+            .Axes(xlValue, xlSecondary).TickLabels.NumberFormat = "0%"
+            .Axes(xlValue, xlSecondary).TickLabels.Font.Size = 8
+            .Axes(xlValue, xlSecondary).MaximumScale = 1
+            .Axes(xlValue, xlSecondary).MinimumScale = 0
+            .Axes(xlCategory).TickLabels.Font.Size = 7
+            .Axes(xlCategory).TickLabelPosition = xlLow
+            On Error GoTo 0
+        End With
+    End If
+    
+    ' Gráfico Bottom
+    If ultFilaBot >= filaDatosInicio Then
+        Dim leftPos2 As Double, topPos2 As Double
+        leftPos2 = wsDest.Cells(filaEncab, 14).Left
+        topPos2 = wsDest.Cells(filaEncab + 12, 14).Top
+        
+        Dim ch2 As ChartObject
+        Set ch2 = wsDest.ChartObjects.Add(Left:=leftPos2, Top:=topPos2, Width:=380, Height:=220)
+        
+        With ch2.Chart
+            .ChartType = xlColumnClustered
+            
+            Do While .SeriesCollection.Count > 0
+                .SeriesCollection(1).Delete
+            Loop
+            
+            Dim sBarra2 As Series
+            Set sBarra2 = .SeriesCollection.NewSeries
+            sBarra2.Name = "Contribución"
+            sBarra2.Values = wsDest.Range(wsDest.Cells(filaDatosInicio, 11), wsDest.Cells(ultFilaBot, 11))
+            sBarra2.XValues = wsDest.Range(wsDest.Cells(filaDatosInicio, 7), wsDest.Cells(ultFilaBot, 7))
+            On Error Resume Next
+            sBarra2.Format.Fill.ForeColor.RGB = RGB(220, 100, 100)
+            On Error GoTo 0
+            
+            Dim sLinea2 As Series
+            Set sLinea2 = .SeriesCollection.NewSeries
+            sLinea2.Name = "% Acumulado"
+            sLinea2.Values = wsDest.Range(wsDest.Cells(filaDatosInicio, 12), wsDest.Cells(ultFilaBot, 12))
+            sLinea2.ChartType = xlLineMarkers
+            On Error Resume Next
+            sLinea2.AxisGroup = xlSecondary
+            sLinea2.Format.Line.ForeColor.RGB = RGB(50, 50, 50)
+            sLinea2.Format.Line.Weight = 2.25
+            On Error GoTo 0
+            
+            .HasTitle = True
+            .ChartTitle.Text = tituloBot
+            .ChartTitle.Font.Size = 11
+            .ChartTitle.Font.Bold = True
+            
+            .HasLegend = True
+            .Legend.Position = xlLegendPositionBottom
+            .Legend.Font.Size = 8
+            
+            On Error Resume Next
+            .Axes(xlValue, xlPrimary).TickLabels.NumberFormat = "0.0000%"
+            .Axes(xlValue, xlPrimary).TickLabels.Font.Size = 8
+            .Axes(xlValue, xlSecondary).TickLabels.NumberFormat = "0%"
+            .Axes(xlValue, xlSecondary).TickLabels.Font.Size = 8
+            .Axes(xlValue, xlSecondary).MaximumScale = 1
+            .Axes(xlValue, xlSecondary).MinimumScale = 0
+            .Axes(xlCategory).TickLabels.Font.Size = 7
+            .Axes(xlCategory).TickLabelPosition = xlLow
+            On Error GoTo 0
+        End With
+    End If
+    
 End Sub
 
+Private Function OrdenarDictPorValor(dic As Object, desc As Boolean) As Collection
+    Dim resultado As Collection
+    Set resultado = New Collection
+    
+    If dic.Count = 0 Then
+        Set OrdenarDictPorValor = resultado
+        Exit Function
+    End If
+    
+    Dim arr() As Variant
+    ReDim arr(1 To dic.Count, 1 To 2)
+    
+    Dim i As Long: i = 0
+    Dim k As Variant
+    For Each k In dic.keys
+        i = i + 1
+        arr(i, 1) = CStr(k)
+        arr(i, 2) = CDbl(dic(k))
+    Next k
+    
+    Dim j As Long
+    Dim tmpK As Variant, tmpV As Variant
+    For i = 1 To dic.Count - 1
+        For j = i + 1 To dic.Count
+            Dim cambiar As Boolean: cambiar = False
+            If desc Then
+                If arr(i, 2) < arr(j, 2) Then cambiar = True
+            Else
+                If arr(i, 2) > arr(j, 2) Then cambiar = True
+            End If
+            
+            If cambiar Then
+                tmpK = arr(i, 1): tmpV = arr(i, 2)
+                arr(i, 1) = arr(j, 1): arr(i, 2) = arr(j, 2)
+                arr(j, 1) = tmpK: arr(j, 2) = tmpV
+            End If
+        Next j
+    Next i
+    
+    For i = 1 To dic.Count
+        resultado.Add CStr(arr(i, 1))
+    Next i
+    
+    Set OrdenarDictPorValor = resultado
+End Function
 
